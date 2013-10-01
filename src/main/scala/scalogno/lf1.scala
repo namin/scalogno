@@ -89,7 +89,7 @@ trait Base {
 
 trait Engine extends Base {
   val DEPTH_MAX: Int = 2000
-  def run[T](f: Exp[T] => Rel): Unit = {
+  def run[T](on: Option[Int])(f: Exp[T] => Rel): Unit = {
     var d: Int = 0
     def printd(x: Any) = println(" "*d+x)
 
@@ -189,13 +189,21 @@ trait Engine extends Base {
     }
 
     val varCount1 = varCount
+    val Done = new Exception
+    var rn: Int = 0
     try {
       val q = fresh[T]
       rec(() => f(q)){() =>
         if (propagate()) {
           dump(q)
+          rn += 1
+          if (rn>=on.getOrElse(rn)) {
+            throw Done
+          }
         }
       }
+    } catch {
+      case Done => // OK
     } finally {
       varCount = varCount1
     }
@@ -300,7 +308,7 @@ object Test extends App with Base with Engine with Naturals with ListBase {
     n === z ||
     %.in { m => n===s(m) && searchNat(m) }
   }
-  run[LF] {
+  run[LF](Some(3)) {
     case Term(q) =>
       searchNat(q.typed(nat))
   }

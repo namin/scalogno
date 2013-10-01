@@ -307,16 +307,9 @@ trait Naturals extends Lf1 {
     add(N1)(N2)(N3) =>:
     add(s(N1))(N2)(s(N3))
   }
-}
 
-object Test extends App with Base with Engine with Naturals with ListBase {
   def searchNat(n: Atom): Rel = {
     n === z ||
     %.in { m => n===s(m) && searchNat(m) }
   }
-  run[LF](Some(3)) {
-    case Term(q) =>
-      searchNat(q.typed(nat))
-  } foreach(println)
 }
-

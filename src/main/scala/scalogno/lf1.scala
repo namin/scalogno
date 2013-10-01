@@ -9,19 +9,20 @@ trait Base {
     varCount += 1
     Exp[T](id)
   }
-  sealed abstract class Constraint
+  abstract class Constraint
   case class IsTerm(id: Int, key: String, args: List[Exp[Any]]) extends Constraint
   case class IsEqual(x: Exp[Any], y: Exp[Any]) extends Constraint
   abstract class Rel
   case class Or(x: () => Rel, y: () => Rel) extends Rel
   case class And(x: () => Rel, y: () => Rel) extends Rel
   case object Yes extends Rel
+  case object No extends Rel
 
-  def keys(c: Constraint) = c match {
+  def keys(c: Constraint): List[Int] = c match {
     case IsEqual(Exp(a),Exp(b)) => List(a,b)
     case IsTerm(a, _, _) => List(a)
   }
-  def prop(c1: Constraint, c2: Constraint)(fail: () => Nothing) = (c1,c2) match {
+  def prop(c1: Constraint, c2: Constraint)(fail: () => Nothing): List[Constraint] = (c1,c2) match {
     case (IsEqual(Exp(a),Exp(b)), IsTerm(a1, key, args)) if a == a1 =>
       List(IsTerm(b, key, args))
     case (IsEqual(Exp(a),Exp(b)), IsTerm(b1, key, args)) if b == b1 =>
@@ -114,6 +115,8 @@ trait Engine extends Base {
             }
           case Yes =>
             f()
+          case No =>
+            throw Backtrack
         }
       } catch {
         case Backtrack => // OK

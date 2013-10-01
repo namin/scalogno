@@ -21,3 +21,5 @@ libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % "2.10.2
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.1" % "test"
 
 libraryDependencies += "junit" % "junit" % "4.11" % "test"
+
+parallelExecution in Test := false

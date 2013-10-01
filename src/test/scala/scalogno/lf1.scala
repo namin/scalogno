@@ -14,5 +14,13 @@ class TestNaturals extends FunSuite with Base with Engine with Naturals with Lis
       }
     }
   }
+  test("3 first additions") {
+    expectResult(List("add(z,x0:nat,x0:nat)","add(s(z),x0:nat,s(x0:nat))","add(s(s(z)),x0:nat,s(s(x0:nat)))")) {
+      run[LF](Some(3)) {
+        case Term(q) =>
+          searchAdd(%.typed(q))
+      }
+    }
+  }
 }
 

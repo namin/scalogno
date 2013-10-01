@@ -112,7 +112,8 @@ trait Engine extends Base {
               if (propagate())
                 rec(b)(f)
             }
-          case Yes => f()
+          case Yes =>
+            f()
         }
       } catch {
         case Backtrack => // OK
@@ -127,16 +128,22 @@ trait Engine extends Base {
       true
     }
 
-    def extract(x: Exp[Any]): String = cstore collectFirst { // extract term
-      case IsTerm(id, key, args) if id == x.id =>
-        if (args.isEmpty) key else
-        key+"("+args.map(extract).mkString(",")+")"
-    } getOrElse canon(x)
-
     def dump(out: java.io.PrintWriter)(x: Exp[Any]): Unit = {
       val idx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
       val stack = new scala.collection.mutable.BitSet(varCount)
       val stack2 = new scala.collection.mutable.BitSet(varCount)
+      var seenVars: Map[Int,Int] = Map.empty
+      def canon(x: Exp[Any]): String = {
+        val id = (Set(x.id) ++ (cstore collect {
+          case IsEqual(`x`,y) if y.id < x.id => y.id
+          case IsEqual(y,`x`) if y.id < x.id => y.id
+        })).min
+        val mid = seenVars.get(id) match {
+          case None => val mid = seenVars.size; seenVars = seenVars.updated(id, mid); mid
+          case Some(mid) => mid
+        }
+        "x"+mid
+      }
       def rec(x: Exp[Any]): Unit = idx.getOrElse(x.id,Set.empty).headOption match {
         case Some(IsTerm(id, key, args)) =>
           assert(id == x.id)
@@ -183,14 +190,6 @@ trait Engine extends Base {
       val out = new java.io.ByteArrayOutputStream
       dump(new java.io.PrintWriter(new java.io.OutputStreamWriter(out)))(x)
       out.toString
-    }
-
-    def canon(x: Exp[Any]): String = { // canonicalize var name
-      val id = (Set(x.id) ++ (cstore collect {
-        case IsEqual(`x`,y) if y.id < x.id => y.id
-        case IsEqual(y,`x`) if y.id < x.id => y.id
-      })).min
-      "x"+id
     }
 
     val varCount1 = varCount
@@ -302,14 +301,18 @@ trait Naturals extends Lf1 {
   val add   = (nat =>: nat =>: nat =>: typ) ("add")
   val add_z = any { N =>
     add(z)(N)(N)
-  }
+  } ("add_z")
   val add_s = any { (N1,N2,N3) =>
     add(N1)(N2)(N3) =>:
     add(s(N1))(N2)(s(N3))
-  }
+  } ("add_s")
 
   def searchNat(n: Atom): Rel = {
     n === z ||
     %.in { m => n===s(m) && searchNat(m) }
+  }
+  def searchAdd(a: Atom): Rel = {
+    a === add_z() ||
+    %.in { a1 => a===add_s()(a1) && searchAdd(a1) }
   }
 }

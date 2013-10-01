@@ -5,7 +5,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class TestCore extends FunSuite with Core {
+class TestSpivey extends FunSuite with Spivey {
   test("1") {
     expectResult(List(List(1, 2, 1))){
       run{q =>

@@ -5,7 +5,7 @@ package scalogno
  * - Embedding Prolog in Haskell by JM Spivey, S Seres (1999)
  * - https://github.com/miniKanren/simple-miniKanren
  */
-trait Core {
+trait Spivey {
   type S[T] = Seq[T]
   type Predicate = Answer => S[Answer]
   type Answer = (Subst,Int)

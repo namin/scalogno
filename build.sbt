@@ -14,6 +14,8 @@ scalacOptions += "-deprecation"
 
 scalacOptions += "-unchecked"
 
+scalacOptions += "-feature"
+
 libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % "2.10.2-RC1"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.1" % "test"

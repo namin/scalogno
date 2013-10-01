@@ -33,7 +33,7 @@ class TestZ3Base extends FunSuite with Z3Base with Engine {
   }
   test("sat2") {
     expectResult(List("0", "1", "2")) {
-      run[Any](Some(3)){q => sat[Int](q){x => IntConstant(0)<=x && x<IntConstant(3)}}
+      run[Any](Some(3)){q => sat[Int](q){x => IntConstant(0)<=x && x<IntConstant(4)}}
     }
   }
 }

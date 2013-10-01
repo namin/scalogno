@@ -89,7 +89,7 @@ trait Base {
 
 trait Engine extends Base {
   val DEPTH_MAX: Int = 2000
-  def run[T](on: Option[Int])(f: Exp[T] => Rel): Unit = {
+  def run[T](on: Option[Int])(f: Exp[T] => Rel): Seq[String] = {
     var d: Int = 0
     def printd(x: Any) = println(" "*d+x)
 
@@ -133,7 +133,7 @@ trait Engine extends Base {
         key+"("+args.map(extract).mkString(",")+")"
     } getOrElse canon(x)
 
-    def dump(x: Exp[Any]): Unit = {
+    def dump(out: java.io.PrintWriter)(x: Exp[Any]): Unit = {
       val idx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
       val stack = new scala.collection.mutable.BitSet(varCount)
       val stack2 = new scala.collection.mutable.BitSet(varCount)
@@ -141,7 +141,7 @@ trait Engine extends Base {
         case Some(IsTerm(id, key, args)) =>
           assert(id == x.id)
           if (stack.contains(id)) {
-            System.out.print("r"+id) // not doing occurs check during unification, at least catch cycles here
+            out.print("r"+id) // not doing occurs check during unification, at least catch cycles here
             stack2 += id
             //return
           }
@@ -150,34 +150,39 @@ trait Engine extends Base {
           if (key == "lf") {
             rec(args.head)
             if (!idx.contains(args.head.id)) {
-              System.out.print(":")
+              out.print(":")
               rec(args.tail.head)
             }
             if (stack2.contains(id))
-              System.out.print("=r"+id)
+              out.print("=r"+id)
             stack -= id
             stack2 -= id
             return
           }
 
-          System.out.print(key)
+          out.print(key)
           if (args.nonEmpty) {
-            System.out.print("(")
+            out.print("(")
             rec(args.head)
-            args.tail.foreach { a => System.out.print(","); rec(a) }
-            System.out.print(")")
+            args.tail.foreach { a => out.print(","); rec(a) }
+            out.print(")")
           }
           if (stack2.contains(id)) {
-            System.out.print("=r"+id)
+            out.print("=r"+id)
           }
           stack -= id
           stack2 -= id
         case _ =>
-          System.out.print(canon(x))
+          out.print(canon(x))
       }
       rec(x)
-      System.out.println
-      System.out.flush
+      out.flush
+    }
+
+    def dumpStr(x: Exp[Any]): String = {
+      val out = new java.io.ByteArrayOutputStream
+      dump(new java.io.PrintWriter(new java.io.OutputStreamWriter(out)))(x)
+      out.toString
     }
 
     def canon(x: Exp[Any]): String = { // canonicalize var name
@@ -191,11 +196,12 @@ trait Engine extends Base {
     val varCount1 = varCount
     val Done = new Exception
     var rn: Int = 0
+    val res = new scala.collection.mutable.ListBuffer[String]()
     try {
       val q = fresh[T]
       rec(() => f(q)){() =>
         if (propagate()) {
-          dump(q)
+          res += dumpStr(q)
           rn += 1
           if (rn>=on.getOrElse(rn)) {
             throw Done
@@ -208,7 +214,7 @@ trait Engine extends Base {
       varCount = varCount1
     }
 
-    println("----")
+    res.toList
   }
 }
 
@@ -311,6 +317,6 @@ object Test extends App with Base with Engine with Naturals with ListBase {
   run[LF](Some(3)) {
     case Term(q) =>
       searchNat(q.typed(nat))
-  }
+  } foreach(println)
 }
 

@@ -110,11 +110,31 @@ trait ListBase extends InjectBase with NatBase with Ordering {
     exists[T,T,List[T],List[T]] { (a,b,as1,bs1) =>
       (as === cons(a,as1)) && f(a,b) && (bs === cons(b,bs1)) && lessEqualLex[T](f,as1,bs1)
     }
-
-
 }
 
+trait TreeBase extends InjectBase with NatBase with Ordering {
 
+  trait Tree[+T,-U]
+
+  def tree[T:Inject,U:Inject](xs: (T,U)*): Exp[Tree[T,U]] = if (xs.length == 0) empty else {
+    val n = xs.length/2
+    val (k,v) = xs(n)
+    branch(tree(xs.slice(0,n):_*),k,v,tree(xs.slice(n+1,xs.length):_*))
+  }
+
+  def branch[T,U](l: Exp[Tree[T,U]], k: Exp[T], v: Exp[U], r: Exp[Tree[T,U]]): Exp[Tree[T,U]] = term("branch",List(l,k,v,r))
+  def leaf[T,U](k:Exp[T],v: Exp[U]) = branch(empty,k,v,empty)
+  def empty: Exp[Tree[Nothing,Any]] = term("nil",List())
+
+  def lookupAll[T,U](as: Exp[Tree[T,U]], k: Exp[T], v: Exp[U]): Rel =
+    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) => 
+      as === branch(l,k1,v1,r) && {
+        (k === k1 && v === v1) ||
+        lookupAll(l,k,v) || lookupAll(r,k,v)
+      }
+    }
+
+}
 
 
 
@@ -278,3 +298,26 @@ class TestLists extends FunSuite with Base with Engine with NatBase with ListBas
   }
 }
 
+
+class TestTrees extends FunSuite with Base with Engine with NatBase with TreeBase {
+
+  test("tree") {
+    expectResult(List(
+      "branch(branch(branch(nil,s(z),a,nil),s(s(z)),b,nil),s(s(s(z))),c,branch(nil,s(s(s(s(z)))),d,nil))"
+    )) {
+      run[List[String]] { q =>
+        q === tree(1 -> "a", 2 -> "b", 3 -> "c", 4 -> "d")
+      }
+    }
+  }
+
+  test("lookup1") {
+    expectResult(List("c")) {
+      run[String] { q =>
+        val t = tree(1 -> "a", 2 -> "b", 3 -> "c", 4 -> "d")
+        lookupAll(t,3,q)
+      }
+    }
+  }
+
+}

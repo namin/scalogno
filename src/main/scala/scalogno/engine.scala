@@ -23,8 +23,12 @@ trait Base {
     case IsTerm(a, _, _) => List(a)
   }
   def prop(c1: Constraint, c2: Constraint)(fail: () => Nothing): List[Constraint] = (c1,c2) match {
+    case (IsTerm(a1, key, args), IsEqual(Exp(a),Exp(b))) if a == a1 =>
+      List(IsTerm(b, key, args))
     case (IsEqual(Exp(a),Exp(b)), IsTerm(a1, key, args)) if a == a1 =>
       List(IsTerm(b, key, args))
+    case (IsTerm(b1, key, args), IsEqual(Exp(a),Exp(b))) if b == b1 =>
+      List(IsTerm(a, key, args))
     case (IsEqual(Exp(a),Exp(b)), IsTerm(b1, key, args)) if b == b1 =>
       List(IsTerm(a, key, args))
     case (IsTerm(a1, key1, args1), IsTerm(a2, key2, args2)) if a1 == a2 =>

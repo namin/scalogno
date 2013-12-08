@@ -28,6 +28,6 @@ unmanagedJars in Compile += {
   file("../ScalaZ3/lib-bin/libscalaz3."+extlib)
 }
 
-libraryDependencies += "ch.epfl.lara" % "scalaz3_2.10" % "2.0"
+libraryDependencies += "ch.epfl.lara" % "scalaz3_2.10" % "2.1"
 
 parallelExecution in Test := false

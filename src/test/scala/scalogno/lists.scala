@@ -134,6 +134,26 @@ trait TreeBase extends InjectBase with NatBase with Ordering {
       }
     }
 
+  def lookup[T:Ord,U](as: Exp[Tree[T,U]], k: Exp[T], v: Exp[U]): Rel =
+    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) => 
+      as === branch(l,k1,v1,r) && {
+        (k === k1 && v === v1) ||
+        (k <= k1 && lookupAll(l,k,v)) || 
+        (k1 <= k && lookupAll(r,k,v))
+      }
+    }
+
+  def lookupLess[T:Ord,U](as: Exp[Tree[T,U]], k: Exp[T], v: Exp[U]): Rel =
+    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) => 
+      as === branch(l,k1,v1,r) && {
+        (lookupLess(l,k,v)) || 
+        (k1 <= k && v === v1) ||
+        (k1 <= k && lookupLess(r,k,v))
+      }
+    }
+
+
+
 }
 
 
@@ -299,7 +319,7 @@ class TestLists extends FunSuite with Base with Engine with NatBase with ListBas
 }
 
 
-class TestTrees extends FunSuite with Base with Engine with NatBase with TreeBase {
+class TestTrees extends FunSuite with Base with Engine with NatBase with ListBase with TreeBase {
 
   test("tree") {
     expectResult(List(
@@ -311,7 +331,7 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with TreeBas
     }
   }
 
-  test("lookup1") {
+  test("lookupAll") {
     expectResult(List("c")) {
       run[String] { q =>
         val t = tree(1 -> "a", 2 -> "b", 3 -> "c", 4 -> "d")
@@ -319,5 +339,33 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with TreeBas
       }
     }
   }
+
+  test("lookupOrd") {
+    expectResult(List("c")) {
+      run[String] { q =>
+        val t = tree(1 -> "a", 2 -> "b", 3 -> "c", 4 -> "d")
+        lookup(t,3,q)
+      }
+    }
+    expectResult(List("c")) {
+      run[String] { q =>
+        val t = tree(List(1,1,1) -> "a", List(1,2,2) -> "b", List(2,1,1) -> "c", List(3,2,2) -> "d")
+        lookup(t,List(2,1,1),q)
+      }
+    }
+    expectResult(Nil) {
+      run[String] { q =>
+        val t = tree(List(1,1,1) -> "a", List(1,2,2) -> "b", List(2,1,1) -> "c", List(3,2,2) -> "d")
+        lookup(t,List(2,2,2),q)
+      }
+    }
+    expectResult(List("a","b","c")) {s
+      run[String] { q =>
+        val t = tree(List(1,1,1) -> "a", List(1,2,2) -> "b", List(2,1,1) -> "c", List(3,2,2) -> "d")
+        lookupLess(t,List(2,2,2),q)
+      }
+    }
+  }
+
 
 }

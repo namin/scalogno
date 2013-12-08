@@ -28,18 +28,18 @@ class TestZ3 extends FunSuite {
 class TestZ3Base extends FunSuite with Z3Base with Engine {
   test("sat1") {
     expectResult(List("0")) {
-      run[Any](Some(3)){q => sat[Int](q){x => x === x*2}}
+      runN[Any](3){q => sat[Int](q){x => x === x*2}}
     }
   }
   test("sat2") {
     expectResult(List("0", "1", "2")) {
-      run[Any](Some(3)){q => sat[Int](q){x => IntConstant(0)<=x && x<IntConstant(4)}}
+      runN[Any](3){q => sat[Int](q){x => IntConstant(0)<=x && x<IntConstant(4)}}
     }
   }
 
   test("sat3") {
     expectResult(List("1", "2", "3")) {
-      run[Any](Some(3)){q =>
+      runN[Any](3){q =>
         sat[Int](q){x => IntConstant(0)<=x && x<IntConstant(4)} &&
         sat[Int](q){x => IntConstant(1)<=x && x<IntConstant(5)}
       }

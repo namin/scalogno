@@ -17,9 +17,26 @@ trait InjectBase extends Base {
 }
 
 
-trait NatBase extends InjectBase {
+trait Ordering extends Base {
+
+  trait Ord[T] {
+    def lte(x:Exp[T],y:Exp[T]): Rel
+  }
+
+  implicit class OrdOps[T:Ord](x:Exp[T]) {
+    def <=(y:Exp[T]): Rel = implicitly[Ord[T]].lte(x,y)
+  }
+
+}
+
+
+
+trait NatBase extends InjectBase with Ordering {
   implicit val injectNat = new Inject[Int] {
     def toTerm(x: Int): Exp[Int] = nat(x)
+  }
+  implicit val ordNat = new Ord[Int] {
+    def lte(x:Exp[Int],y:Exp[Int]): Rel = lessEqual(x,y)
   }
 
   def nat(x: Int): Exp[Int] = if (x == 0) zero else succ(x-1)
@@ -37,9 +54,12 @@ trait NatBase extends InjectBase {
 
 
 
-trait ListBase extends InjectBase with NatBase {
+trait ListBase extends InjectBase with NatBase with Ordering {
   implicit def injectList[T:Inject] = new Inject[List[T]] {
     def toTerm(x: List[T]): Exp[List[T]] = list(x:_*)
+  }
+  implicit def ordList[T:Ord] = new Ord[List[T]] {
+    def lte(x:Exp[List[T]],y:Exp[List[T]]): Rel = lessEqualLex[T]((a1,a2) => a1 <= a2, x,y)
   }
 
   def list[T:Inject](xs: T*): Exp[List[T]] = if (xs.isEmpty) nil else cons(inject(xs.head),list(xs.tail:_*))
@@ -93,6 +113,10 @@ trait ListBase extends InjectBase with NatBase {
 
 
 }
+
+
+
+
 
 
 import org.scalatest._
@@ -231,6 +255,24 @@ class TestLists extends FunSuite with Base with Engine with NatBase with ListBas
     )) {
       run[List[Int]] { q =>
         lessEqualLex[Int]((q1,q2) => lessEqual(q1,q2), q, list(0,1,2))
+      }
+    }
+  }
+  test("lessEqualOrd") {
+    expectResult(List(
+      "nil", 
+      "cons(z,nil)", 
+      "cons(z,cons(z,nil))", 
+      "cons(z,cons(z,cons(z,nil)))", 
+      "cons(z,cons(z,cons(s(z),nil)))", 
+      "cons(z,cons(z,cons(s(s(z)),nil)))", 
+      "cons(z,cons(s(z),nil))", 
+      "cons(z,cons(s(z),cons(z,nil)))", 
+      "cons(z,cons(s(z),cons(s(z),nil)))", 
+      "cons(z,cons(s(z),cons(s(s(z)),nil)))"
+    )) {
+      run[List[Int]] { q =>
+        q <= List(0,1,2)
       }
     }
   }

@@ -17,7 +17,27 @@ trait InjectBase extends Base {
 }
 
 
-trait ListBase extends InjectBase {
+trait NatBase extends InjectBase {
+  implicit val injectNat = new Inject[Int] {
+    def toTerm(x: Int): Exp[Int] = nat(x)
+  }
+
+  def nat(x: Int): Exp[Int] = if (x == 0) zero else succ(x-1)
+
+  def succ(n: Exp[Int]): Exp[Int] = term("s",List(n))
+  def zero: Exp[Int] = term("z",List())
+
+  def lessEqual(a: Exp[Int], b: Exp[Int]): Rel = 
+    (a === zero) || exists[Int,Int] { (a1,b1) => 
+      (a === succ(a1)) && (b === succ(b1)) && lessEqual(a1,b1)
+    }
+
+}
+
+
+
+
+trait ListBase extends InjectBase with NatBase {
   implicit def injectList[T:Inject] = new Inject[List[T]] {
     def toTerm(x: List[T]): Exp[List[T]] = list(x:_*)
   }
@@ -44,11 +64,7 @@ trait ListBase extends InjectBase {
       Some((a,b))
     }
   }
-}
 
-import org.scalatest._
-
-class TestLists extends FunSuite with Base with Engine with Naturals with ListBase {
 
   def append[T](as: Exp[List[T]], bs: Exp[List[T]], cs: Exp[List[T]]): Rel =
     (as === nil && bs === cs) ||
@@ -59,7 +75,7 @@ class TestLists extends FunSuite with Base with Engine with Naturals with ListBa
   def map[T,U](f: (Exp[T],Exp[U]) => Rel, as: Exp[List[T]], bs: Exp[List[U]]): Rel =
     (as === nil) && (bs === nil) ||
     exists[T,U,List[T],List[U]] { (a,b,as1,bs1) =>
-      (as === cons(a,as1)) && (f(a,b) && (bs === cons(b,bs1)) && map[T,U](f,as1,bs1))
+      (as === cons(a,as1)) && f(a,b) && (bs === cons(b,bs1)) && map[T,U](f,as1,bs1)
     }
 
   def flatMap[T,U](f: (Exp[T],Exp[List[U]]) => Rel, as: Exp[List[T]], cs: Exp[List[U]]): Rel =
@@ -68,6 +84,32 @@ class TestLists extends FunSuite with Base with Engine with Naturals with ListBa
       (as === cons(a,as1)) && f(a,bs) && append(bs, cs1, cs) && flatMap[T,U](f,as1,cs1)
     }
 
+
+  def lessEqualLex[T](f: (Exp[T],Exp[T]) => Rel, as: Exp[List[T]], bs: Exp[List[T]]): Rel =
+    (as === nil) ||
+    exists[T,T,List[T],List[T]] { (a,b,as1,bs1) =>
+      (as === cons(a,as1)) && f(a,b) && (bs === cons(b,bs1)) && lessEqualLex[T](f,as1,bs1)
+    }
+
+
+}
+
+
+import org.scalatest._
+
+class TestNats extends FunSuite with Base with Engine with NatBase with ListBase {
+
+  test("lte") {
+    expectResult(List("s(s(s(x0)))")) {
+      run[Int] { q =>
+        lessEqual(3, q)
+      }
+    }
+  }
+
+}
+
+class TestLists extends FunSuite with Base with Engine with NatBase with ListBase {
 
   test("append") {
     expectResult(List("cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))")) {
@@ -101,6 +143,7 @@ class TestLists extends FunSuite with Base with Engine with Naturals with ListBa
       }
     }
   }
+
   test("pair") {
     expectResult(List(
       "pair(nil,cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil)))))))", 
@@ -173,5 +216,23 @@ class TestLists extends FunSuite with Base with Engine with Naturals with ListBa
     }
   }
 
+  test("lessEqual") {
+    expectResult(List(
+      "nil", 
+      "cons(z,nil)", 
+      "cons(z,cons(z,nil))", 
+      "cons(z,cons(z,cons(z,nil)))", 
+      "cons(z,cons(z,cons(s(z),nil)))", 
+      "cons(z,cons(z,cons(s(s(z)),nil)))", 
+      "cons(z,cons(s(z),nil))", 
+      "cons(z,cons(s(z),cons(z,nil)))", 
+      "cons(z,cons(s(z),cons(s(z),nil)))", 
+      "cons(z,cons(s(z),cons(s(s(z)),nil)))"
+    )) {
+      run[List[Int]] { q =>
+        lessEqualLex[Int]((q1,q2) => lessEqual(q1,q2), q, list(0,1,2))
+      }
+    }
+  }
 }
 

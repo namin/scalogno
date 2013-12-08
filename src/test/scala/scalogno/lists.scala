@@ -41,6 +41,11 @@ class TestLists extends FunSuite with Base with Engine with Naturals with ListBa
       (as === cons(a,as1)) && (f(a,b) && (bs === cons(b,bs1)) && map[T,U](f,as1,bs1))
     }
 
+  def flatMap[T,U](f: (Exp[T],Exp[List[U]]) => Rel, as: Exp[List[T]], cs: Exp[List[U]]): Rel =
+    (as === nil) && (cs === nil) ||
+    exists[T,List[U],List[T],List[U]] { (a,bs,as1,cs1) =>
+      (as === cons(a,as1)) && f(a,bs) && flatMap[T,U](f,as1,cs1) && append(bs,cs1,cs) 
+    }
 
 
   test("append") {
@@ -132,5 +137,15 @@ class TestLists extends FunSuite with Base with Engine with Naturals with ListBa
       }
     }
   }
+
+
+  test("flatMap") {
+    expectResult(List("cons(a,cons(a,cons(b,cons(b,cons(c,cons(c,nil))))))")) {
+      run[List[String]] { q =>
+        flatMap[String,String]((q1,q2) => q2 === cons(q1,cons(q1,nil)) , list("a","b","c"), q)
+      }
+    }
+  }
+
 }
 

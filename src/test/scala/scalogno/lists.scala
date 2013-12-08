@@ -1,7 +1,28 @@
 package scalogno
 
-trait ListBase extends Base {
-  def list(xs: String*): Exp[List[String]] = if (xs.isEmpty) nil else cons(term(xs.head,Nil),list(xs.tail:_*))
+import scala.language.implicitConversions
+
+trait InjectBase extends Base {
+
+  trait Inject[T] {
+    def toTerm(x:T): Exp[T]
+  }
+
+  implicit def inject[T:Inject](x:T) = implicitly[Inject[T]].toTerm(x)
+
+  implicit object InjectString extends Inject[String] {
+    def toTerm(s: String): Exp[String] = term(s,Nil)
+  }
+
+}
+
+
+trait ListBase extends InjectBase {
+  implicit def injectList[T:Inject] = new Inject[List[T]] {
+    def toTerm(x: List[T]): Exp[List[T]] = list(x:_*)
+  }
+
+  def list[T:Inject](xs: T*): Exp[List[T]] = if (xs.isEmpty) nil else cons(inject(xs.head),list(xs.tail:_*))
 
   def cons[T](hd: Exp[T], tl: Exp[List[T]]): Exp[List[T]] = term("cons",List(hd,tl))
   def nil: Exp[List[Nothing]] = term("nil",List())

@@ -104,7 +104,7 @@ trait Engine extends Base {
 
     def rec(e: () => Rel)(f: () => Unit): Unit = {
       if (d == DEPTH_MAX) {
-        printd("ABORT depth "+d)
+        println("ABORT depth "+d)
         return
       }
       val d1 = d

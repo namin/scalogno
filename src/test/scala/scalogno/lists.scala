@@ -152,9 +152,62 @@ trait TreeBase extends InjectBase with NatBase with Ordering {
       }
     }
 
+}
+
+trait GraphBase extends InjectBase with NatBase {
+
+  trait Graph[T] {
+    def edge(a: Exp[T], b: Exp[T]): Rel
+    def path(a: Exp[T], b: Exp[T]): Rel =
+      edge(a,b) || exists[T] { z => edge(a,z) && path(z,b) }
+  }
+
+  def pathClause[T] = {
+    exists[T,T] { (a,b) => 
+      Yes
+    }
+  }
+}
+
+
+trait ReifyUtils extends InjectBase with ListBase with Engine {
+
+  var inrule: List[String] = Nil
+  val globalTrace = fresh[List[List[String]]]
+  var traceAccum = globalTrace
+
+  def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
+    { (a,b) => 
+      val self = s + "(" + extractStr(a) + "," + extractStr(b) + ")"
+      val local = self::inrule
+      //println("enter " + self + " at " + inrule.mkString(",")); 
+
+      val newAccum = fresh[List[List[String]]]
+      traceAccum === cons(term(s,List(a,b)),newAccum)
+      traceAccum = newAccum
+
+      def vprintln(s: Any) = () // println(s)
+
+      try {         
+        def rec(n:Int)(r: Rel): Rel = r match {
+          case Or(a,b) => 
+            Or(() => { inrule = local; vprintln("left  in "+n+self); rec(n+1)(a()) }, 
+               () => { inrule = local; vprintln("right in "+n+self); rec(n+1)(b()) })
+          case And(a,b) => 
+            And(() => { inrule = local; vprintln("fst in "+n+self); rec(n+1)(a()) }, 
+                () => { inrule = local; vprintln("snd in "+n+self); rec(n+1)(b()) })
+          case _ => r
+        }
+        rec(0)(f(a,b))
+      } finally {
+        inrule = local.tail
+      }
+    }
+
 
 
 }
+
 
 
 
@@ -359,7 +412,7 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with ListBas
         lookup(t,List(2,2,2),q)
       }
     }
-    expectResult(List("a","b","c")) {s
+    expectResult(List("a","b","c")) {
       run[String] { q =>
         val t = tree(List(1,1,1) -> "a", List(1,2,2) -> "b", List(2,1,1) -> "c", List(3,2,2) -> "d")
         lookupLess(t,List(2,2,2),q)
@@ -367,5 +420,59 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with ListBas
     }
   }
 
+
+}
+
+
+
+class TestGraphs extends FunSuite with Base with Engine with NatBase with ListBase with GraphBase with ReifyUtils {
+
+  test("graph") {
+
+    val g = new Graph[String] {
+      def edge(x:Exp[String],y:Exp[String]) = 
+        (x === "a") && (y === "b") ||
+        (x === "b") && (y === "c") ||
+        (x === "c") && (y === "a")
+    }
+
+    expectResult(List(
+      "pair(a,b)", "pair(b,c)", "pair(c,a)"
+    )) {
+      run[(String,String)] { case Pair(q1,q2) =>
+        g.edge(q1,q2)
+      }
+    }
+    expectResult(List(
+      "b", "c", "a", "b", "c", "a", "b", "c", "a", "b"
+    )) {
+      runN[String](10) { q =>
+        g.path("a",q)
+      }
+    }
+  }
+
+  test("trace") {
+    val traceG = new Graph[String] {
+      def edge(x:Exp[String],y:Exp[String]) = 
+        (x === "a") && (y === "b") ||
+        (x === "b") && (y === "c") ||
+        (x === "c") && (y === "a")
+
+      override def path(x:Exp[String],y:Exp[String]) = rule("path")(super.path)(x,y)
+    }
+
+    expectResult(List(
+      "pair(b,cons(path(a,b),nil))", 
+      "pair(c,cons(path(a,c),cons(path(b,c),nil)))", 
+      "pair(a,cons(path(a,a),cons(path(b,a),cons(path(c,a),nil))))", 
+      "pair(b,cons(path(a,b),cons(path(b,b),cons(path(c,b),cons(path(a,b),nil)))))", 
+      "pair(c,cons(path(a,c),cons(path(b,c),cons(path(c,c),cons(path(a,c),cons(path(b,c),nil))))))"
+    )) {
+      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+        globalTrace === q2 && traceG.path("a",q1) && traceAccum === nil
+      }
+    }
+  }
 
 }

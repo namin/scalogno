@@ -177,30 +177,48 @@ trait ReifyUtils extends InjectBase with ListBase with Engine {
   // - implement infix_|| and infix_&& to create Or and And
   //   objects that automatically set/reset all DynVars
 
-  var inrule: List[String] = Nil
-  val globalTrace = fresh[List[List[String]]]
-  var traceAccum = globalTrace
+  var globalTrace: Exp[List[List[String]]] = nil
+
+  // inject non-std interpretation by overriding || and &&
+
+  override def infix_||(a: => Rel, b: => Rel): Rel = {
+    val localTrace = globalTrace
+    def reset(x: => Rel) = { globalTrace = localTrace; x }
+    super.infix_||(reset(a),reset(b))
+  }
+  override def infix_&&(a: => Rel, b: => Rel): Rel = {
+    val localTrace = globalTrace
+    def reset(x: => Rel) = { globalTrace = localTrace; x }
+    super.infix_&&(reset(a),b) // do not reset b
+  }
 
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
+    { (a,b) => 
+      globalTrace = cons(term(s,List(a,b)),globalTrace); 
+      f(a,b)
+    }
+
+  // inject non-std interpretation by transforming rules reified as Or and And
+
+  var inrule: List[String] = Nil
+  def rule0[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
     { (a,b) => 
       val self = s + "(" + extractStr(a) + "," + extractStr(b) + ")"
       val local = self::inrule
       //println("enter " + self + " at " + inrule.mkString(",")); 
 
-      val newAccum = fresh[List[List[String]]]
-      traceAccum === cons(term(s,List(a,b)),newAccum)
-      traceAccum = newAccum
+      val localTrace = cons(term(s,List(a,b)),globalTrace)
 
       def vprintln(s: Any) = () // println(s)
 
       try {         
         def rec(n:Int)(r: Rel): Rel = r match {
           case Or(a,b) => 
-            Or(() => { inrule = local; traceAccum = newAccum; vprintln("left  in "+n+self); rec(n+1)(a()) }, 
-               () => { inrule = local; traceAccum = newAccum; vprintln("right in "+n+self); rec(n+1)(b()) })
+            Or(() => { inrule = local; globalTrace = localTrace; vprintln("left  in "+n+self); rec(n+1)(a()) }, 
+               () => { inrule = local; globalTrace = localTrace; vprintln("right in "+n+self); rec(n+1)(b()) })
           case And(a,b) => 
-            And(() => { inrule = local; traceAccum = newAccum; vprintln("fst in "+n+self); rec(n+1)(a()) }, 
-                () => { inrule = local; traceAccum = newAccum; vprintln("snd in "+n+self); rec(n+1)(b()) })
+            And(() => { inrule = local; globalTrace = localTrace; vprintln("fst in "+n+self); rec(n+1)(a()) }, 
+                () => { inrule = local; globalTrace = localTrace; vprintln("snd in "+n+self); rec(n+1)(b()) }) // should not reset?
           case _ => r
         }
         rec(0)(f(a,b))
@@ -208,8 +226,6 @@ trait ReifyUtils extends InjectBase with ListBase with Engine {
         inrule = local.tail
       }
     }
-
-
 
 }
 
@@ -469,13 +485,13 @@ class TestGraphs extends FunSuite with Base with Engine with NatBase with ListBa
 
     expectResult(List(
       "pair(b,cons(path(a,b),nil))", 
-      "pair(c,cons(path(a,c),cons(path(b,c),nil)))", 
-      "pair(a,cons(path(a,a),cons(path(b,a),cons(path(c,a),nil))))", 
-      "pair(b,cons(path(a,b),cons(path(b,b),cons(path(c,b),cons(path(a,b),nil)))))", 
-      "pair(c,cons(path(a,c),cons(path(b,c),cons(path(c,c),cons(path(a,c),cons(path(b,c),nil))))))"
+      "pair(c,cons(path(b,c),cons(path(a,c),nil)))", 
+      "pair(a,cons(path(c,a),cons(path(b,a),cons(path(a,a),nil))))", 
+      "pair(b,cons(path(a,b),cons(path(c,b),cons(path(b,b),cons(path(a,b),nil)))))", 
+      "pair(c,cons(path(b,c),cons(path(a,c),cons(path(c,c),cons(path(b,c),cons(path(a,c),nil))))))"
     )) {
       runN[(String,List[String])](5) { case Pair(q1,q2) =>
-        globalTrace === q2 && traceG.path("a",q1) && traceAccum === nil
+        traceG.path("a",q1) && globalTrace === q2
       }
     }
   }

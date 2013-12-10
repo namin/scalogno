@@ -172,6 +172,11 @@ trait GraphBase extends InjectBase with NatBase {
 
 trait ReifyUtils extends InjectBase with ListBase with Engine {
 
+  // possible improvement:
+  // - add DynVar abstraction, keep in a global list
+  // - implement infix_|| and infix_&& to create Or and And
+  //   objects that automatically set/reset all DynVars
+
   var inrule: List[String] = Nil
   val globalTrace = fresh[List[List[String]]]
   var traceAccum = globalTrace
@@ -191,11 +196,11 @@ trait ReifyUtils extends InjectBase with ListBase with Engine {
       try {         
         def rec(n:Int)(r: Rel): Rel = r match {
           case Or(a,b) => 
-            Or(() => { inrule = local; vprintln("left  in "+n+self); rec(n+1)(a()) }, 
-               () => { inrule = local; vprintln("right in "+n+self); rec(n+1)(b()) })
+            Or(() => { inrule = local; traceAccum = newAccum; vprintln("left  in "+n+self); rec(n+1)(a()) }, 
+               () => { inrule = local; traceAccum = newAccum; vprintln("right in "+n+self); rec(n+1)(b()) })
           case And(a,b) => 
-            And(() => { inrule = local; vprintln("fst in "+n+self); rec(n+1)(a()) }, 
-                () => { inrule = local; vprintln("snd in "+n+self); rec(n+1)(b()) })
+            And(() => { inrule = local; traceAccum = newAccum; vprintln("fst in "+n+self); rec(n+1)(a()) }, 
+                () => { inrule = local; traceAccum = newAccum; vprintln("snd in "+n+self); rec(n+1)(b()) })
           case _ => r
         }
         rec(0)(f(a,b))

@@ -20,11 +20,11 @@ trait InjectBase extends Base {
 trait Ordering extends Base {
 
   trait Ord[T] {
-    def lte(x:Exp[T],y:Exp[T]): Rel
+    def lt(x:Exp[T],y:Exp[T]): Rel
   }
 
   implicit class OrdOps[T:Ord](x:Exp[T]) {
-    def <=(y:Exp[T]): Rel = implicitly[Ord[T]].lte(x,y)
+    def <(y:Exp[T]): Rel = implicitly[Ord[T]].lt(x,y)
   }
 
 }
@@ -36,7 +36,7 @@ trait NatBase extends InjectBase with Ordering {
     def toTerm(x: Int): Exp[Int] = nat(x)
   }
   implicit val ordNat = new Ord[Int] {
-    def lte(x:Exp[Int],y:Exp[Int]): Rel = lessEqual(x,y)
+    def lt(x:Exp[Int],y:Exp[Int]): Rel = lessThan(x,y)
   }
 
   def nat(x: Int): Exp[Int] = if (x == 0) zero else succ(x-1)
@@ -44,10 +44,10 @@ trait NatBase extends InjectBase with Ordering {
   def succ(n: Exp[Int]): Exp[Int] = term("s",List(n))
   def zero: Exp[Int] = term("z",List())
 
-  def lessEqual(a: Exp[Int], b: Exp[Int]): Rel = 
-    (a === zero) || exists[Int,Int] { (a1,b1) => 
-      (a === succ(a1)) && (b === succ(b1)) && lessEqual(a1,b1)
-    }
+  def lessThan(a: Exp[Int], b: Exp[Int]): Rel = 
+    exists[Int] { b1 => b === succ(b1) && { a === zero || exists[Int] { a1 =>
+      (a === succ(a1)) && lessThan(a1,b1)
+    }}}
 
 }
 
@@ -59,7 +59,7 @@ trait ListBase extends InjectBase with NatBase with Ordering {
     def toTerm(x: List[T]): Exp[List[T]] = list(x:_*)
   }
   implicit def ordList[T:Ord] = new Ord[List[T]] {
-    def lte(x:Exp[List[T]],y:Exp[List[T]]): Rel = lessEqualLex[T]((a1,a2) => a1 <= a2, x,y)
+    def lt(x:Exp[List[T]],y:Exp[List[T]]): Rel = lessLex[T]((a1,a2) => a1 < a2, x,y)
   }
 
   def list[T:Inject](xs: T*): Exp[List[T]] = if (xs.isEmpty) nil else cons(inject(xs.head),list(xs.tail:_*))
@@ -105,11 +105,12 @@ trait ListBase extends InjectBase with NatBase with Ordering {
     }
 
 
-  def lessEqualLex[T](f: (Exp[T],Exp[T]) => Rel, as: Exp[List[T]], bs: Exp[List[T]]): Rel =
-    (as === nil) ||
-    exists[T,T,List[T],List[T]] { (a,b,as1,bs1) =>
-      (as === cons(a,as1)) && f(a,b) && (bs === cons(b,bs1)) && lessEqualLex[T](f,as1,bs1)
-    }
+  def lessLex[T](f: (Exp[T],Exp[T]) => Rel, as: Exp[List[T]], bs: Exp[List[T]]): Rel =
+    exists[T,List[T]] { (b,bs1) => (bs === cons(b,bs1)) && { (as === nil) ||
+      exists[T,List[T]] { (a,as1) =>
+        (as === cons(a,as1)) && { f(a,b) || (a === b) && lessLex[T](f,as1,bs1) }
+      }
+    }}
 }
 
 trait TreeBase extends InjectBase with NatBase with Ordering {
@@ -140,8 +141,8 @@ trait TreeBase extends InjectBase with NatBase with Ordering {
     exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) => 
       as === branch(l,k1,v1,r) && {
         (k === k1 && v === v1) ||
-        (k <= k1 && lookupAll(l,k,v)) || 
-        (k1 <= k && lookupAll(r,k,v))
+        (k < k1 && lookup(l,k,v)) || 
+        (k1 < k && lookup(r,k,v))
       }
     }
 
@@ -149,8 +150,8 @@ trait TreeBase extends InjectBase with NatBase with Ordering {
     exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) => 
       as === branch(l,k1,v1,r) && {
         (lookupLess(l,k,v)) || 
-        (k1 <= k && v === v1) ||
-        (k1 <= k && lookupLess(r,k,v))
+        (k1 < k && v === v1) ||
+        (k1 < k && lookupLess(r,k,v))
       }
     }
 
@@ -240,9 +241,9 @@ import org.scalatest._
 class TestNats extends FunSuite with Base with Engine with NatBase with ListBase {
 
   test("lte") {
-    expectResult(List("s(s(s(x0)))")) {
+    expectResult(List("s(s(s(s(x0))))")) {
       run[Int] { q =>
-        lessEqual(3, q)
+        lessThan(3, q)
       }
     }
   }
@@ -356,39 +357,31 @@ class TestLists extends FunSuite with Base with Engine with NatBase with ListBas
     }
   }
 
-  test("lessEqual") {
+  test("lessThan") {
     expectResult(List(
       "nil", 
       "cons(z,nil)", 
-      "cons(z,cons(z,nil))", 
-      "cons(z,cons(z,cons(z,nil)))", 
-      "cons(z,cons(z,cons(s(z),nil)))", 
-      "cons(z,cons(z,cons(s(s(z)),nil)))", 
+      "cons(z,cons(z,x0))", 
       "cons(z,cons(s(z),nil))", 
-      "cons(z,cons(s(z),cons(z,nil)))", 
-      "cons(z,cons(s(z),cons(s(z),nil)))", 
-      "cons(z,cons(s(z),cons(s(s(z)),nil)))"
+      "cons(z,cons(s(z),cons(z,x0)))", 
+      "cons(z,cons(s(z),cons(s(z),x0)))"
     )) {
       run[List[Int]] { q =>
-        lessEqualLex[Int]((q1,q2) => lessEqual(q1,q2), q, list(0,1,2))
+        lessLex[Int]((q1,q2) => lessThan(q1,q2), q, list(0,1,2))
       }
     }
   }
-  test("lessEqualOrd") {
+  test("lessThanOrd") {
     expectResult(List(
       "nil", 
       "cons(z,nil)", 
-      "cons(z,cons(z,nil))", 
-      "cons(z,cons(z,cons(z,nil)))", 
-      "cons(z,cons(z,cons(s(z),nil)))", 
-      "cons(z,cons(z,cons(s(s(z)),nil)))", 
+      "cons(z,cons(z,x0))", 
       "cons(z,cons(s(z),nil))", 
-      "cons(z,cons(s(z),cons(z,nil)))", 
-      "cons(z,cons(s(z),cons(s(z),nil)))", 
-      "cons(z,cons(s(z),cons(s(s(z)),nil)))"
+      "cons(z,cons(s(z),cons(z,x0)))", 
+      "cons(z,cons(s(z),cons(s(z),x0)))"
     )) {
       run[List[Int]] { q =>
-        q <= List(0,1,2)
+        q < List(0,1,2)
       }
     }
   }
@@ -423,6 +416,12 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with ListBas
         lookup(t,3,q)
       }
     }
+    expectResult(List("b")) {
+      run[String] { q =>
+        val t = tree(List(1,1,1) -> "a", List(1,2,2) -> "b", List(2,1,1) -> "c", List(3,2,2) -> "d")
+        lookup(t,List(1,2,2),q)
+      }
+    }
     expectResult(List("c")) {
       run[String] { q =>
         val t = tree(List(1,1,1) -> "a", List(1,2,2) -> "b", List(2,1,1) -> "c", List(3,2,2) -> "d")
@@ -439,6 +438,21 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with ListBas
       run[String] { q =>
         val t = tree(List(1,1,1) -> "a", List(1,2,2) -> "b", List(2,1,1) -> "c", List(3,2,2) -> "d")
         lookupLess(t,List(2,2,2),q)
+      }
+    }
+  }
+
+  test("lookup with holes") {
+    expectResult(List("s(s(z))")) {
+      run[Int] { q =>
+        val t = tree(List(1,1,1) -> "a", List(1,2,2) -> "b", cons(q,List(1,1)) -> inject("c"), List(3,2,2) -> "d")
+        lookup(t,List(2,1,1),"c")
+      }
+    }
+    expectResult(List("s(z)")) {
+      run[Int] { q =>
+        val t = tree(List(1,1,1) -> "a", cons(q,List(2,2)) -> inject("b"), List(2,2,2) -> "c", List(3,2,2) -> "d")
+        lookup(t,List(1,2,2),"b")
       }
     }
   }

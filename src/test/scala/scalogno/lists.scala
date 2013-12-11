@@ -116,7 +116,9 @@ trait TreeBase extends InjectBase with NatBase with Ordering {
 
   trait Tree[+T,-U]
 
-  def tree[T:Inject,U:Inject](xs: (T,U)*): Exp[Tree[T,U]] = if (xs.length == 0) empty else {
+  implicit def injectPair[T:Inject,U:Inject](x: (T,U)) = (inject(x._1), inject(x._2))
+
+  def tree[T,U](xs: (Exp[T],Exp[U])*): Exp[Tree[T,U]] = if (xs.length == 0) empty else {
     val n = xs.length/2
     val (k,v) = xs(n)
     branch(tree(xs.slice(0,n):_*),k,v,tree(xs.slice(n+1,xs.length):_*))

@@ -182,12 +182,14 @@ trait MetaGraphBase extends GraphBase with ListBase {
         (== tail ‘((patho ,z ,y))))))))
 */
 
+  def pathTerm[T](a: Exp[T], b: Exp[T]) = term("path",List(a,b))
+
   def pathClause1[T](g: Graph[T])(head: Exp[Any], body: Exp[List[Any]]) = {
     exists[T,T] { (a,b) => 
-      RelOps(head === term("patho",List(a,b))) && {
+      (head === pathTerm(a,b)) && {
         g.edge(a,b) && (body === nil) ||
         exists[T] { z =>
-          g.edge(a,z) && (body === term("patho",List(z,b)))
+          g.edge(a,z) && (body === pathTerm(z,b))
         }
       }
     }
@@ -565,12 +567,12 @@ class TestMetaGraphs extends FunSuite with Base with Engine with MetaGraphBase {
     }
 
     expectResult(List(
-      "cons(to prove,cons(patho(a,b),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(patho(b,c),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(patho(c,a),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(patho(a,x0),cons(prove,cons(patho(b,x0),nil))))", 
-      "cons(to prove,cons(patho(b,x0),cons(prove,cons(patho(c,x0),nil))))", 
-      "cons(to prove,cons(patho(c,x0),cons(prove,cons(patho(a,x0),nil))))"
+      "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(path(a,x0),cons(prove,cons(path(b,x0),nil))))", 
+      "cons(to prove,cons(path(b,x0),cons(prove,cons(path(c,x0),nil))))", 
+      "cons(to prove,cons(path(c,x0),cons(prove,cons(path(a,x0),nil))))"
     )) {
       run[List[Any]] { q =>
         exists[Any,List[Any]] { (head,body) =>

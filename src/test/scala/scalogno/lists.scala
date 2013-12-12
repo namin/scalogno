@@ -165,9 +165,31 @@ trait GraphBase extends InjectBase with NatBase {
       edge(a,b) || exists[T] { z => edge(a,z) && path(z,b) }
   }
 
-  def pathClause[T] = {
+}
+
+trait MetaGraphBase extends GraphBase with ListBase {
+
+  type Clause
+
+/*
+(define (patho-clause head tail) 
+  (fresh (x y)
+    (== head ‘(patho ,x ,y)) 
+    (conde
+      ((edgeo x y) (== tail ’())) 
+      ((fresh (z)
+        (edgeo x z)
+        (== tail ‘((patho ,z ,y))))))))
+*/
+
+  def pathClause1[T](g: Graph[T])(head: Exp[Any], body: Exp[List[Any]]) = {
     exists[T,T] { (a,b) => 
-      Yes
+      RelOps(head === term("patho",List(a,b))) && {
+        g.edge(a,b) && (body === nil) ||
+        exists[T] { z =>
+          g.edge(a,z) && (body === term("patho",List(z,b)))
+        }
+      }
     }
   }
 }
@@ -529,3 +551,34 @@ trait TestGraphsBase extends FunSuite with Base with Engine with NatBase with Li
 class TestGraphs extends TestGraphsBase with ReifyUtils
 
 class TestGraphsDynVars extends TestGraphsBase with ReifyUtilsDynVars
+
+
+class TestMetaGraphs extends FunSuite with Base with Engine with MetaGraphBase {
+
+  test("meta graph") {
+
+    val g = new Graph[String] {
+      def edge(x:Exp[String],y:Exp[String]) = 
+        (x === "a") && (y === "b") ||
+        (x === "b") && (y === "c") ||
+        (x === "c") && (y === "a")
+    }
+
+    expectResult(List(
+      "cons(to prove,cons(patho(a,b),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(patho(b,c),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(patho(c,a),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(patho(a,x0),cons(prove,cons(patho(b,x0),nil))))", 
+      "cons(to prove,cons(patho(b,x0),cons(prove,cons(patho(c,x0),nil))))", 
+      "cons(to prove,cons(patho(c,x0),cons(prove,cons(patho(a,x0),nil))))"
+    )) {
+      run[List[Any]] { q =>
+        exists[Any,List[Any]] { (head,body) =>
+          q === cons("to prove", cons(head, cons("prove", cons(body, nil)))) && 
+          pathClause1(g)(head,body)
+        }
+      }
+    }
+  }
+}
+

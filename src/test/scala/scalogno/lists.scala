@@ -180,26 +180,57 @@ trait MetaGraphBase extends GraphBase with ListBase {
         (== tail ‘((patho ,z ,y))))))))
 */
 
-  def pathTerm[T](a: Exp[T], b: Exp[T]) = term("path",List(a,b))
+  trait Goal
 
-  def pathClause1[T](g: Graph[T])(head: Exp[Any], body: Exp[List[Any]]) = {
+  def pathTerm[T](a: Exp[T], b: Exp[T]) = term[Goal]("path",List(a,b))
+
+  def pathClause1[T](g: Graph[T])(head: Exp[Goal], body: Exp[List[Goal]]) = {
     exists[T,T] { (a,b) => 
       (head === pathTerm(a,b)) && {
-        g.edge(a,b) && (body === nil) ||
+        (g.edge(a,b) && (body === nil)) ||
         exists[T] { z =>
-          g.edge(a,z) && (body === pathTerm(z,b))
+          g.edge(a,z) && (body === cons(pathTerm(z,b),nil))
         }
       }
     }
   }
 
-  type Clause = (Exp[Any], Exp[List[Any]]) => Rel
+/*
+(define (vanilla* clause)
+  (define (solve* goals)
+    (conde
+      ((== goals ’())) 
+      ((fresh (g gs body)
+        (== (cons g gs) goals) 
+        (clause g body) 
+        (solve* body)
+        (solve* gs)))))
+  solve*)
+
+(run 10 (q)
+  ((vanilla* patho-clause)
+   ‘((patho a ,q)))) => (b c a b c a b c a b)
+
+*/
+
+  def vanilla(clause: Clause)(goals: Exp[List[Goal]]): Rel = 
+    goals === nil || 
+    exists[Goal,List[Goal],List[Goal]] { (g, gs, body) => 
+      (goals === cons(g,gs)) &&
+      clause(g,body) &&
+      vanilla(clause)(body) &&
+      vanilla(clause)(gs)
+    }
+
+
+
+  type Clause = (Exp[Goal], Exp[List[Goal]]) => Rel
 
   def existsC[T,U](f: (Exp[T],Exp[U]) => Clause): Clause = {
     f(fresh[T],fresh[U])
   }
 
-  def pathClause2[T](g: Graph[T])(a: Exp[T], b: Exp[T]) = { (head: Exp[Any], body: Exp[List[Any]]) =>
+  def pathClause2[T](g: Graph[T])(a: Exp[T], b: Exp[T]) = { (head: Exp[Goal], body: Exp[List[Goal]]) =>
     (head === pathTerm(a,b)) && {
       g.edge(a,b) && (body === nil) ||
       exists[T] { z =>
@@ -585,12 +616,12 @@ class TestMetaGraphs extends FunSuite with Base with Engine with MetaGraphBase {
       "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))", 
       "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))", 
       "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(a,x0),cons(prove,cons(path(b,x0),nil))))", 
-      "cons(to prove,cons(path(b,x0),cons(prove,cons(path(c,x0),nil))))", 
-      "cons(to prove,cons(path(c,x0),cons(prove,cons(path(a,x0),nil))))"
+      "cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil))))", 
+      "cons(to prove,cons(path(b,x0),cons(prove,cons(cons(path(c,x0),nil),nil))))", 
+      "cons(to prove,cons(path(c,x0),cons(prove,cons(cons(path(a,x0),nil),nil))))"
     )) {
       run[List[Any]] { q =>
-        exists[Any,List[Any]] { (head,body) =>
+        exists[Goal,List[Goal]] { (head,body) =>
           q === cons("to prove", cons(head, cons("prove", cons(body, nil)))) && 
           pathClause1(g)(head,body)
         }
@@ -607,13 +638,32 @@ class TestMetaGraphs extends FunSuite with Base with Engine with MetaGraphBase {
     )) {
       run[List[Any]] { q =>
         val clause = existsC[String,String] { (a,b) => pathClause2(g)(a,b) }        
-        exists[Any,List[Any]] { (head,body) =>
+        exists[Goal,List[Goal]] { (head,body) =>
           clause(head,body) && q === cons("to prove", cons(head, cons("prove", cons(body, nil))))
         }
       }
     }
   }
 
+
+  test("graph interp") {
+
+    val g = new Graph[String] {
+      def edge(x:Exp[String],y:Exp[String]) = 
+        (x === "a") && (y === "b") ||
+        (x === "b") && (y === "c") ||
+        (x === "c") && (y === "a")
+    }
+
+    expectResult(List(
+      "b", "c", "a", "b", "c", "a", "b", "c", "a", "b"
+    )) {
+      runN[List[Any]](10) { q =>
+        vanilla(pathClause1(g))(cons(pathTerm("a",q),nil))
+      }
+    }
+
+  }
 
 }
 

@@ -169,8 +169,6 @@ trait GraphBase extends InjectBase with NatBase {
 
 trait MetaGraphBase extends GraphBase with ListBase {
 
-  type Clause
-
 /*
 (define (patho-clause head tail) 
   (fresh (x y)
@@ -194,6 +192,23 @@ trait MetaGraphBase extends GraphBase with ListBase {
       }
     }
   }
+
+  type Clause = (Exp[Any], Exp[List[Any]]) => Rel
+
+  def existsC[T,U](f: (Exp[T],Exp[U]) => Clause): Clause = {
+    f(fresh[T],fresh[U])
+  }
+
+  def pathClause2[T](g: Graph[T])(a: Exp[T], b: Exp[T]) = { (head: Exp[Any], body: Exp[List[Any]]) =>
+    (head === pathTerm(a,b)) && {
+      g.edge(a,b) && (body === nil) ||
+      exists[T] { z =>
+        g.edge(a,z) && (body === pathTerm(z,b))
+      }
+    }
+  }
+
+
 }
 
 trait ReifyUtilsBase extends Base with InjectBase with ListBase with Engine {
@@ -581,6 +596,24 @@ class TestMetaGraphs extends FunSuite with Base with Engine with MetaGraphBase {
         }
       }
     }
+
+    expectResult(List(
+      "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))", 
+      "cons(to prove,cons(path(a,x0),cons(prove,cons(path(b,x0),nil))))", 
+      "cons(to prove,cons(path(b,x0),cons(prove,cons(path(c,x0),nil))))", 
+      "cons(to prove,cons(path(c,x0),cons(prove,cons(path(a,x0),nil))))"
+    )) {
+      run[List[Any]] { q =>
+        val clause = existsC[String,String] { (a,b) => pathClause2(g)(a,b) }        
+        exists[Any,List[Any]] { (head,body) =>
+          clause(head,body) && q === cons("to prove", cons(head, cons("prove", cons(body, nil))))
+        }
+      }
+    }
   }
+
+
 }
 

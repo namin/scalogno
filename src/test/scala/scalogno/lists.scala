@@ -172,8 +172,29 @@ trait GraphBase extends InjectBase with NatBase {
   }
 }
 
+trait ReifyUtilsBase extends Base with InjectBase with ListBase with Engine {
+  def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel
+  def globalTrace: Exp[List[List[String]]]
+}
 
-trait ReifyUtils extends InjectBase with ListBase with Engine {
+trait ReifyUtilsDynVars extends ReifyUtilsBase with InjectBase with ListBase with Engine {
+  val globalTraceId = "globalTrace"
+  override def globalTrace = dvar_get[Exp[List[List[String]]]](globalTraceId)
+  def initGlobalTrace() = dvar_set(globalTraceId, nil)
+
+  def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
+    { (a,b) =>
+      dvar_upd(globalTraceId){trace: Exp[List[List[String]]] => cons(term(s,List(a,b)), trace)}
+      f(a,b)
+    }
+
+  override def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
+    initGlobalTrace()
+    super.runN(max)(f)
+  }
+}
+
+trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engine {
 
   // possible improvement:
   // - add DynVar abstraction, keep in a global list
@@ -462,7 +483,7 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with ListBas
 
 
 
-class TestGraphs extends FunSuite with Base with Engine with NatBase with ListBase with GraphBase with ReifyUtils {
+trait TestGraphsBase extends FunSuite with Base with Engine with NatBase with ListBase with GraphBase with ReifyUtilsBase {
 
   test("graph") {
 
@@ -513,3 +534,7 @@ class TestGraphs extends FunSuite with Base with Engine with NatBase with ListBa
   }
 
 }
+
+class TestGraphs extends TestGraphsBase with ReifyUtils
+
+class TestGraphsDynVars extends TestGraphsBase with ReifyUtilsDynVars

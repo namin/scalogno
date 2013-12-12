@@ -40,6 +40,12 @@ trait Base {
   val cstore0: Set[Constraint] = Set.empty
   var cstore: Set[Constraint] = cstore0
   var cindex: Map[Int, Set[Constraint]] = Map.empty withDefaultValue Set.empty
+  val dvars0: Map[String, Any] = Map.empty
+  var dvars: Map[String, Any] = dvars0
+
+  def dvar_set[T](id: String, v: T): Unit = dvars += id -> v
+  def dvar_get[T](id: String): T = dvars(id).asInstanceOf[T]
+  def dvar_upd[T](id: String)(f: T => T): Unit = dvars += id -> f(dvar_get(id))
 
   def register(c: Constraint): Unit = {
     if (cstore.contains(c)) return
@@ -110,6 +116,7 @@ trait Engine extends Base {
       val d1 = d
       val cstore1 = cstore
       val cindex1 = cindex
+      val dvars1 = dvars
       try {
         d += 1
         e() match {
@@ -131,6 +138,7 @@ trait Engine extends Base {
       } finally {
         cstore = cstore1
         cindex = cindex1
+        dvars = dvars1
         d = d1
       }
     }

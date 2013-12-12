@@ -40,12 +40,23 @@ trait Base {
   val cstore0: Set[Constraint] = Set.empty
   var cstore: Set[Constraint] = cstore0
   var cindex: Map[Int, Set[Constraint]] = Map.empty withDefaultValue Set.empty
-  val dvars0: Map[String, Any] = Map.empty
-  var dvars: Map[String, Any] = dvars0
+  val dvars0: Map[DVar[_], Any] = Map.empty withDefault { case DVar(id,v) => v }
+  var dvars: Map[DVar[_], Any] = dvars0
 
-  def dvar_set[T](id: String, v: T): Unit = dvars += id -> v
-  def dvar_get[T](id: String): T = dvars(id).asInstanceOf[T]
-  def dvar_upd[T](id: String)(f: T => T): Unit = dvars += id -> f(dvar_get(id))
+  case class DVar[T](id: Int, default: T) extends (() => T) {
+    def apply() = dvar_get(this)
+    def :=(v: T) = dvar_set(this, v)
+  }
+
+  def DVar[T](v: T): DVar[T] = {
+    val id = varCount
+    varCount += 1
+    new DVar[T](id, v)
+  }
+
+  def dvar_set[T](id: DVar[T], v: T): Unit = dvars += id -> v
+  def dvar_get[T](id: DVar[T]): T = dvars(id).asInstanceOf[T]
+  def dvar_upd[T](id: DVar[T])(f: T => T): Unit = dvars += id -> f(dvar_get(id))
 
   def register(c: Constraint): Unit = {
     if (cstore.contains(c)) return

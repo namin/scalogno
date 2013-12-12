@@ -174,51 +174,42 @@ trait GraphBase extends InjectBase with NatBase {
 
 trait ReifyUtilsBase extends Base with InjectBase with ListBase with Engine {
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel
-  def globalTrace: Exp[List[List[String]]]
+  def globalTrace: () => Exp[List[List[String]]]
 }
 
 trait ReifyUtilsDynVars extends ReifyUtilsBase with InjectBase with ListBase with Engine {
-  val globalTraceId = "globalTrace"
-  override def globalTrace = dvar_get[Exp[List[List[String]]]](globalTraceId)
-  def initGlobalTrace() = dvar_set(globalTraceId, nil)
+  val globalTrace = DVar(nil: Exp[List[List[String]]])
 
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
     { (a,b) =>
-      dvar_upd(globalTraceId){trace: Exp[List[List[String]]] => cons(term(s,List(a,b)), trace)}
+      globalTrace := cons(term(s,List(a,b)), globalTrace())
       f(a,b)
     }
-
-  override def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
-    initGlobalTrace()
-    super.runN(max)(f)
-  }
 }
 
 trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engine {
 
-  // possible improvement:
-  // - add DynVar abstraction, keep in a global list
-  // - implement infix_|| and infix_&& to create Or and And
-  //   objects that automatically set/reset all DynVars
+  var globalTrace0: Exp[List[List[String]]] = nil
 
-  var globalTrace: Exp[List[List[String]]] = nil
+  def globalTrace = () => globalTrace0
+  def globalTrace_=(x:Exp[List[List[String]]]) = globalTrace0 = x
 
   // inject non-std interpretation by overriding || and &&
 
   override def infix_||(a: => Rel, b: => Rel): Rel = {
-    val localTrace = globalTrace
+    val localTrace = globalTrace()
     def reset(x: => Rel) = { globalTrace = localTrace; x }
     super.infix_||(reset(a),reset(b))
   }
   override def infix_&&(a: => Rel, b: => Rel): Rel = {
-    val localTrace = globalTrace
+    val localTrace = globalTrace()
     def reset(x: => Rel) = { globalTrace = localTrace; x }
     super.infix_&&(reset(a),b) // do not reset b
   }
 
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
     { (a,b) => 
-      globalTrace = cons(term(s,List(a,b)),globalTrace); 
+      globalTrace = cons(term(s,List(a,b)),globalTrace()); 
       f(a,b)
     }
 
@@ -231,7 +222,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
       val local = self::inrule
       //println("enter " + self + " at " + inrule.mkString(",")); 
 
-      val localTrace = cons(term(s,List(a,b)),globalTrace)
+      val localTrace = cons(term(s,List(a,b)),globalTrace())
 
       def vprintln(s: Any) = () // println(s)
 
@@ -528,7 +519,7 @@ trait TestGraphsBase extends FunSuite with Base with Engine with NatBase with Li
       "pair(c,cons(path(b,c),cons(path(a,c),cons(path(c,c),cons(path(b,c),cons(path(a,c),nil))))))"
     )) {
       runN[(String,List[String])](5) { case Pair(q1,q2) =>
-        traceG.path("a",q1) && globalTrace === q2
+        traceG.path("a",q1) && globalTrace() === q2
       }
     }
   }

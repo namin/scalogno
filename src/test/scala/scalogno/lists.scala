@@ -384,6 +384,74 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
 
 
 
+trait STLC extends Base with InjectBase with ListBase with Engine {
+
+  trait LTerm
+  trait LType
+  trait Deriv
+  trait Rule
+
+  type Sym = Int
+  type Env = List[LType]
+
+  implicit class EnvOps(x: Exp[Env]) {
+    def |- (y: (Exp[LTerm],Exp[LType])) = term[Deriv]("|-", List(x,y._1,y._2))
+  }
+
+  implicit class TypeOps(x: Exp[LType]) {
+    def :: (e: Exp[LTerm]) = (e,x)
+    def -> (y: Exp[LType]) = term[LType]("->", List(x,y))
+  }
+
+  implicit class TermOps(x: Exp[LTerm]) {
+    def app(y: Exp[LTerm]) = term[LTerm]("@", List(x,y))
+  }
+
+  def sym(x: Exp[Sym]) = term[LTerm]("var", List(x))
+
+  def lam(x: Exp[Sym], y: Exp[LTerm]) = term[LTerm]("lam", List(x,y))
+
+  // judgments
+
+  def lookup(g: Exp[Env], x: Exp[Sym], tp: Exp[LType]): Rel = 
+    exists[LType,Env] { (hd,tl) => 
+      g === cons(hd,tl) && {
+        freein(tl,x) && (hd === tp) || 
+        lookup(tl,x,tp)
+      }
+    }
+
+  def freein(g: Exp[Env], x: Exp[Sym]): Rel = 
+    g === nil && x === zero ||
+    exists[Sym,Env] { (x1,tl) => 
+      g === cons(fresh[LType],tl) && x === succ(x1) && freein(tl,x1)
+    }
+
+  def typecheck(d: Exp[Deriv]): Rel = 
+    exists[Env,Sym,LType] { (G,x,t1) =>
+      val a = G |- sym(x) :: t1
+
+      d === a && lookup(G,x,t1)
+    } ||
+    exists[Env,Sym,LTerm,LType,LType] { (G,x,e,t1,t2) =>
+      val a = G |- lam(x,e) :: (t1 -> t2)
+      val b = cons(t1,G) |- e :: t2
+
+      d === a && freein(G,x) && typecheck(b)
+    } ||
+    exists[Env,LTerm,LTerm,LType,LType] { (G,e1,e2,t1,t2) =>
+      val a = G |- (e1 app e2) :: t2
+      val b = G |- e1 :: (t1 -> t2)
+      val c = G |- e2 :: t1
+
+      d === a && typecheck(b) && typecheck(c)
+    }
+}
+
+
+
+
+
 
 
 import org.scalatest._
@@ -758,3 +826,55 @@ class TestMetaGraphs extends FunSuite with Base with Engine with MetaGraphBase {
 
 }
 
+
+
+class TestSTLC extends FunSuite with Base with Engine with STLC {
+
+  test("stlc1") {
+    expectResult(List(
+      "pair(cons(x0,nil),pair(z,x0))", 
+      "pair(cons(x0,cons(x1,nil)),pair(s(z),x0))", 
+      "pair(cons(x0,cons(x1,cons(x2,nil))),pair(s(s(z)),x0))"
+    )) {
+      runN[(Env,(Sym,LType))](3) { case Pair(g,Pair(x,tp)) =>
+        lookup(g,x,tp)
+      }
+    }
+
+    expectResult(List(
+      "pair(cons(x0,nil),pair(z,x0))", 
+      "pair(cons(x0,cons(x1,nil)),pair(s(z),x0))", 
+      "pair(cons(x0,cons(x1,cons(x2,nil))),pair(s(s(z)),x0))"
+    )) {
+      runN[(Env,(Sym,LType))](3) { case Pair(g,Pair(x,tp)) =>
+        val d1 = g |- sym(x) :: tp
+        typecheck(d1)
+      }
+    }
+
+    expectResult(List(
+      "|-(cons(x0,cons(->(x0,x1),nil)),@(var(z),var(s(z))),x1)", 
+      "|-(cons(x0,cons(x1,cons(->(x1,x2),nil))),@(var(z),var(s(z))),x2)", 
+      "|-(cons(x0,cons(x1,cons(x2,cons(->(x2,x3),nil)))),@(var(z),var(s(z))),x3)"
+    )) {
+      runN[Deriv](3) { d =>
+        val a = fresh[Env] |- (sym(0) app sym(1)) :: fresh[LType]
+        d === a && typecheck(d)
+      }
+    }
+
+    expectResult(List(
+      "|-(nil,lam(z,lam(s(z),@(var(z),var(s(z))))),->(->(x0,x1),->(x0,x1)))"
+    )) {
+      runN[Deriv](3) { d =>
+        val x,y = fresh[Sym]
+        val a = nil |- lam(x, lam(y, (sym(x) app sym(y)))) :: fresh[LType]
+        d === a && typecheck(d)
+      }
+    }
+
+
+  }
+
+
+}

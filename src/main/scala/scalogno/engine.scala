@@ -23,6 +23,11 @@ trait Base {
     case IsTerm(a, _, _) => List(a)
   }
   def prop(c1: Constraint, c2: Constraint)(fail: () => Nothing): List[Constraint] = (c1,c2) match {
+    case (IsEqual(a1,b1), IsEqual(a2,b2)) if a1 == a2 || a1 == b2 || b1 == a2 || b1 == b2 =>
+      List(IsEqual(a1,a2),IsEqual(a1,b2),IsEqual(b1,a2),IsEqual(b1,b2))
+
+    case (IsEqual(Exp(a),Exp(b)), IsTerm(a1, key, args)) if a == a1 =>
+      List(IsTerm(b, key, args))
     case (IsTerm(a1, key, args), IsEqual(Exp(a),Exp(b))) if a == a1 =>
       List(IsTerm(b, key, args))
     case (IsEqual(Exp(a),Exp(b)), IsTerm(a1, key, args)) if a == a1 =>
@@ -31,6 +36,7 @@ trait Base {
       List(IsTerm(a, key, args))
     case (IsEqual(Exp(a),Exp(b)), IsTerm(b1, key, args)) if b == b1 =>
       List(IsTerm(a, key, args))
+
     case (IsTerm(a1, key1, args1), IsTerm(a2, key2, args2)) if a1 == a2 =>
       if (key1 != key2 || args1.length != args2.length) fail()
       (args1,args2).zipped map (IsEqual(_,_))
@@ -109,6 +115,9 @@ trait Base {
   }
   def exists[T,U,V,W](f: (Exp[T],Exp[U],Exp[V],Exp[W]) => Rel): Rel = {
     f(fresh[T],fresh[U],fresh[V],fresh[W])
+  }
+  def exists[T,U,V,W,X](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X])
   }
 }
 

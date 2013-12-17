@@ -878,3 +878,60 @@ class TestSTLC extends FunSuite with Base with Engine with STLC {
 
 
 }
+
+
+class TestProb extends FunSuite with ListBase with NatBase with Engine {
+
+  implicit val injectBool = new Inject[Boolean] {
+    def toTerm(x: Boolean): Exp[Boolean] = term(x.toString,Nil)
+  }
+  implicit val injectDouble = new Inject[Double] {
+    def toTerm(x: Double): Exp[Double] = term(x.toString,Nil)
+  }
+
+  val theprob = DVar(1.0)
+
+  def flip(p: Double, x: Exp[Boolean]): Rel =
+    { theprob := theprob() * p; x === true } || 
+    { theprob := theprob() * (1.0 - p); x === false }
+
+  def flip2(p: Double)(a: => Rel)(b: => Rel): Rel =
+    { theprob := theprob() * p; a } || 
+    { theprob := theprob() * (1.0 - p); b }
+
+
+  test("prob1") {
+
+    expectResult(List(
+      "pair(true,0.2)", 
+      "pair(false,0.8)"
+    )) {
+      runN[(Boolean,Double)](3) { case Pair(c,p) =>
+        flip(0.2,c) && { p === theprob() }
+      }
+    }
+
+    expectResult(List(
+      s"pair(true,${1.0*0.2*0.2})"
+    )) {
+      runN[(Boolean,Double)](3) { case Pair(c,p) =>
+        // what about call-time choice???
+        flip(0.2,c) && flip(0.2,c) && { c === true } && { p === theprob() }
+      }
+    }
+
+    expectResult(List(
+      "pair(true,0.2)"
+    )) {
+      runN[(Boolean,Double)](3) { case Pair(c,p) =>
+        // what about call-time choice???
+        flip2(0.2) { c === true } { c === false } && { c === true } && { p === theprob() }
+      }
+    }
+
+
+  }
+
+}
+
+

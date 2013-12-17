@@ -391,8 +391,8 @@ trait STLC extends Base with InjectBase with ListBase with Engine {
   trait Deriv
   trait Rule
 
-  type Sym = Int
-  type Env = List[LType]
+  type Sym
+  type Env
 
   implicit class EnvOps(x: Exp[Env]) {
     def |- (y: (Exp[LTerm],Exp[LType])) = term[Deriv]("|-", List(x,y._1,y._2))
@@ -413,6 +413,42 @@ trait STLC extends Base with InjectBase with ListBase with Engine {
 
   // judgments
 
+  def extend(g: Exp[Env], x: Exp[Sym], tp: Exp[LType], g1: Exp[Env]): Rel
+
+  def lookup(g: Exp[Env], x: Exp[Sym], tp: Exp[LType]): Rel
+
+  def typecheck(d: Exp[Deriv]): Rel = 
+    exists[Env,Sym,LType] { (G,x,t1) =>
+      val a = G |- sym(x) :: t1
+
+      d === a && lookup(G,x,t1)
+    } ||
+    exists[Env,Env,Sym,LTerm,LType,LType] { (G,G1,x,e,t1,t2) =>
+      val a = G |- lam(x,e) :: (t1 -> t2)
+      val b = G1 |- e :: t2
+
+      d === a && extend(G,x,t1,G1) && typecheck(b)
+    } ||
+    exists[Env,LTerm,LTerm,LType,LType] { (G,e1,e2,t1,t2) =>
+      val a = G |- (e1 app e2) :: t2
+      val b = G |- e1 :: (t1 -> t2)
+      val c = G |- e2 :: t1
+
+      d === a && typecheck(b) && typecheck(c)
+    }
+}
+
+trait STLC_ReverseDeBruijn extends STLC {
+
+  // env is list of types, indexed by int
+
+  type Sym = Int
+  type Env = List[LType]
+
+  def extend(g: Exp[Env], x: Exp[Sym], tp: Exp[LType], g1: Exp[Env]): Rel =
+    g1 === cons(tp,g) && freein(g,x)
+
+
   def lookup(g: Exp[Env], x: Exp[Sym], tp: Exp[LType]): Rel = 
     exists[LType,Env] { (hd,tl) => 
       g === cons(hd,tl) && {
@@ -426,30 +462,34 @@ trait STLC extends Base with InjectBase with ListBase with Engine {
     exists[Sym,Env] { (x1,tl) => 
       g === cons(fresh[LType],tl) && x === succ(x1) && freein(tl,x1)
     }
-
-  def typecheck(d: Exp[Deriv]): Rel = 
-    exists[Env,Sym,LType] { (G,x,t1) =>
-      val a = G |- sym(x) :: t1
-
-      d === a && lookup(G,x,t1)
-    } ||
-    exists[Env,Sym,LTerm,LType,LType] { (G,x,e,t1,t2) =>
-      val a = G |- lam(x,e) :: (t1 -> t2)
-      val b = cons(t1,G) |- e :: t2
-
-      d === a && freein(G,x) && typecheck(b)
-    } ||
-    exists[Env,LTerm,LTerm,LType,LType] { (G,e1,e2,t1,t2) =>
-      val a = G |- (e1 app e2) :: t2
-      val b = G |- e1 :: (t1 -> t2)
-      val c = G |- e2 :: t1
-
-      d === a && typecheck(b) && typecheck(c)
-    }
 }
 
+trait STLC_Nat extends STLC {
 
+  implicit class NatTermOps(x: Exp[LTerm]) {
+    def +(y: Exp[LTerm]) = term[LTerm]("+", List(x,y))
+  }
 
+  def tnat = term[LType]("nat",Nil)
+
+  def cnat(x: Exp[Int]) = term[LTerm]("nat",List(x))
+
+  override def typecheck(d: Exp[Deriv]): Rel = 
+    exists[Env,Int] { (G,x) =>
+      val a = G |- cnat(x) :: tnat
+
+      d === a
+    } ||
+    exists[Env,LTerm,LTerm] { (G,e1,e2) =>
+      val a = G |- (e1 + e2) :: tnat
+      val b = G |- e1 :: tnat
+      val c = G |- e2 :: tnat
+
+      d === a && typecheck(b) && typecheck(c)
+    } ||
+    super.typecheck(d)
+
+}
 
 
 
@@ -828,7 +868,7 @@ class TestMetaGraphs extends FunSuite with Base with Engine with MetaGraphBase {
 
 
 
-class TestSTLC extends FunSuite with Base with Engine with STLC {
+class TestSTLC extends FunSuite with Base with Engine with STLC with STLC_ReverseDeBruijn with STLC_Nat {
 
   test("stlc1") {
     expectResult(List(
@@ -873,6 +913,15 @@ class TestSTLC extends FunSuite with Base with Engine with STLC {
       }
     }
 
+    expectResult(List(
+      "|-(nil,lam(z,lam(s(z),+(var(z),var(s(z))))),->(nat,->(nat,nat)))"
+    )) {
+      runN[Deriv](3) { d =>
+        val x,y = fresh[Sym]
+        val a = nil |- lam(x, lam(y, (sym(x) + sym(y)))) :: fresh[LType]
+        d === a && typecheck(d)
+      }
+    }
 
   }
 
@@ -924,11 +973,9 @@ class TestProb extends FunSuite with ListBase with NatBase with Engine {
       "pair(true,0.2)"
     )) {
       runN[(Boolean,Double)](3) { case Pair(c,p) =>
-        // what about call-time choice???
         flip2(0.2) { c === true } { c === false } && { c === true } && { p === theprob() }
       }
     }
-
 
   }
 

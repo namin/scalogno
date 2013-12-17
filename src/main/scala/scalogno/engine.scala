@@ -119,6 +119,9 @@ trait Base {
   def exists[T,U,V,W,X](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X]) => Rel): Rel = {
     f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X])
   }
+  def exists[T,U,V,W,X,Y](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X],Exp[Y]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X],fresh[Y])
+  }
 }
 
 trait Engine extends Base {

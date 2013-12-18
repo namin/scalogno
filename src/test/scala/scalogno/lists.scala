@@ -924,6 +924,77 @@ class TestSTLC extends FunSuite with Base with Engine with STLC with STLC_Revers
     }
 
   }
+}
+
+
+class TestXX extends FunSuite with ListBase with NatBase with Engine with MetaGraphBase {
+
+  trait LF
+
+  val typ = term[LF]("type",Nil)
+
+  def lf(x:Exp[LF],y:Exp[LF]) = term[Goal]("lf",List(x,y))
+
+  val nat = term[LF]("nat",Nil)
+
+  val z = term[LF]("z",Nil)
+
+  def s(x:Exp[LF]) = term[LF]("s",List(x))
+
+  def lte(x:Exp[LF],y:Exp[LF]) = term[LF]("lte",List(x,y))
+
+  def lte_z = term[LF]("lte_z",Nil)
+  def lte_s(x:Exp[LF]) = term[LF]("lte_s",List(x))
+
+  def clauses(head: Exp[Goal], body: Exp[List[Goal]]): Rel = 
+    (head === lf(nat,typ)) && (body === nil) || // nat
+    (head === lf(z,nat))   && (body === nil) ||
+    exists[LF] { x => 
+      (head === lf(s(x),nat)) && (body === cons(lf(x,nat),nil))
+    } || // lte
+    exists[LF,LF] { (x,y) => 
+      (head === lf(lte(x,y),typ)) && (body === cons(lf(x,nat),cons(lf(y,nat),nil)))
+    } ||
+    exists[LF,LF] { (x,y) => 
+      (head === lf(lte_z,lte(z,x))) && (body === nil)
+    } ||
+    exists[LF,LF,LF] { (x,y,u) => 
+      (head === lf(lte_s(u),lte(s(x),s(y)))) && (body === cons(lf(u,lte(x,y)),nil))
+    }
+
+/*
+lte-trans : lte A B -> lte B C -> lte A C -> type.
+%mode lte-trans +A +B -C.
+
+-/z : lte-trans lte/z B lte/z.
+-/s : lte-trans (lte/s A) (lte/s B) (lte/s C)
+     <- lte-trans A B C.
+
+%worlds () (lte-trans _ _ _).
+%total A (lte-trans A _ _).
+*/
+
+  test("clause interp") {
+
+    expectResult(List(
+      "z", "s(z)", "s(s(z))"
+    )) {
+      runN[LF](3) { q =>
+        vanilla(clauses)(cons(lf(q,nat),nil))
+      }
+    }
+
+    expectResult(List(
+      "pair(lte_s(lte_s(lte_z)),s(s(x0)))"
+    )) {
+      runN[(LF,LF)](3) { case Pair(q,n) =>
+        vanilla(clauses)(cons(lf(q,lte(s(s(z)),n)),nil))
+      }
+    }
+
+
+  }
+
 
 
 }

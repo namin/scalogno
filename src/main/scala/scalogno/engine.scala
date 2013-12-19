@@ -15,6 +15,11 @@ trait Base {
   abstract class Rel
   case class Or(x: () => Rel, y: () => Rel) extends Rel
   case class And(x: () => Rel, y: () => Rel) extends Rel
+  case class Custom(s:String) extends Rel {
+    def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+      k()
+    }
+  }
   case object Yes extends Rel
   case object No extends Rel
 
@@ -143,6 +148,8 @@ trait Engine extends Base {
       try {
         d += 1
         e() match {
+          case g@Custom(s) =>
+            g.run(rec)(f)
           case Or(a,b) =>
             rec(a)(f)
             rec(b)(f)

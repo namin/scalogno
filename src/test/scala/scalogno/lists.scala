@@ -49,6 +49,12 @@ trait NatBase extends InjectBase with Ordering {
       (a === succ(a1)) && lessThan(a1,b1)
     }}}
 
+  def add(a: Exp[Int], b: Exp[Int], c: Exp[Int]): Rel = 
+    (a === zero) && (b === c) ||
+    exists[Int,Int] { (a1,c1) =>
+      (a === succ(a1)) && (c === succ(c1)) && add(a1,b,c1)
+    }
+
 }
 
 
@@ -1053,3 +1059,75 @@ class TestProb extends FunSuite with ListBase with NatBase with Engine {
 }
 
 
+class TestTabling extends FunSuite with ListBase with NatBase with Engine {
+
+  type Entry = Exp[Any]
+
+  var table = new scala.collection.mutable.HashMap[String, Entry]
+
+  var enabled = true
+
+  def memo(goal: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
+    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+      val key = extractStr(goal)
+      table.get(key) match {
+        case Some(goal1) if enabled => 
+          println(key + " seen: " + extractStr(goal1))
+          goal === goal1 // FIXME: not general enough!!!
+          // TODO: invoke continuation with all stored answers
+          // store continuation so that it can be called for future answers
+          k()
+        case _ => 
+          println(key)
+          table(key) = goal
+          rec(() => a) { () => 
+            if (enabled) println("answer for "+key+": " + extractStr(goal)) 
+            // TODO: memoize answer (if exists ignore?)
+            // invoke all stored continuations with new answer
+            k()
+          }
+      }
+    }
+  }
+
+
+  def fib(x:Exp[Int], y:Exp[Int]): Rel = memo(term("fib",List(x,y))) {
+    (x === 0) && (y === 1) ||
+    (x === 1) && (y === 1) || {
+      val x1,x2,y1,y2 = fresh[Int]
+      (x === succ(x1)) && (x === (succ(succ(x2)))) &&
+      fib(x1,y1) && fib(x2,y2) &&
+      add(y1,y2,y)
+    }
+  }
+
+
+  test("fib1") {
+    table.clear; enabled = false
+
+    expectResult(List(
+      "s(s(s(s(s(s(s(s(z))))))))"
+    )) {
+      runN[Int](3) { q =>
+        fib(5,q)
+      }
+    }
+    println("done")
+  }
+
+  test("fib2") {
+    table.clear; enabled = true 
+
+    expectResult(List(
+      "s(s(s(s(s(s(s(s(z))))))))"
+    )) {
+      runN[Int](3) { q =>
+        fib(5,q)
+      }
+    }
+    println("done")
+
+  }
+
+
+}

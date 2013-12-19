@@ -1128,6 +1128,45 @@ class TestTabling extends FunSuite with ListBase with NatBase with Engine {
     println("done")
 
   }
+}
 
+// TODO: finish it up!
+class TestTabling2 extends FunSuite with ListBase with NatBase with Engine {
 
+  type Answer = (Exp[Any] => Unit)
+  type Cont = (() => Unit)
+
+  val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
+  val contTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.Set[Cont]] with scala.collection.mutable.MultiMap[String, Cont]
+
+  def constrainAs(g: Exp[Any]): Answer = ??? // TODO!
+
+  def memo(goal: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
+    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+      val key = extractStr(goal)
+      contTable.addBinding(key, k)
+      ansTable.get(key) match {
+        case Some(answers) => 
+          println("found" + key)
+          for ((ansKey, ansConstr) <- answers) {
+            rec{() => ansConstr(goal); Yes}(k) // clean it up to ansConstr(goal, k)
+          }
+        case _ => 
+          println("not found: " + key)
+          val ansMap = new scala.collection.mutable.HashMap[String, Answer]
+          ansTable(key) = ansMap
+          rec(() => a) { () => 
+            val ansKey = extractStr(goal)
+            ansMap.get(ansKey) match {
+              case None => println("answer for "+key+": " + ansKey) 
+                ansMap(ansKey) = constrainAs(goal)
+                for (cont <- contTable(key)) {
+                  cont()
+                }
+              case Some(_) => // fail
+            }
+          }
+      }
+    }
+  }
 }

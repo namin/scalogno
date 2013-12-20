@@ -1059,13 +1059,28 @@ class TestProb extends FunSuite with ListBase with NatBase with Engine {
 }
 
 
-class TestTabling extends FunSuite with ListBase with NatBase with Engine {
+
+trait TablingBase extends Base with Engine {
+
+  def memo(goal: Exp[Any])(a: => Rel): Rel
+
+  def tabling(on: Boolean): Unit
+
+}  
+
+
+trait Tabling1 extends TablingBase {
 
   type Entry = Exp[Any]
 
   var table = new scala.collection.mutable.HashMap[String, Entry]
 
   var enabled = true
+
+  def tabling(on: Boolean): Unit = {
+    table.clear
+    enabled = on
+  }
 
   def memo(goal: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
     override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
@@ -1090,54 +1105,26 @@ class TestTabling extends FunSuite with ListBase with NatBase with Engine {
     }
   }
 
-
-  def fib(x:Exp[Int], y:Exp[Int]): Rel = memo(term("fib",List(x,y))) {
-    (x === 0) && (y === 1) ||
-    (x === 1) && (y === 1) || {
-      val x1,x2,y1,y2 = fresh[Int]
-      (x === succ(x1)) && (x === (succ(succ(x2)))) &&
-      fib(x1,y1) && fib(x2,y2) &&
-      add(y1,y2,y)
-    }
-  }
-
-
-  test("fib1") {
-    table.clear; enabled = false
-
-    expectResult(List(
-      "s(s(s(s(s(s(s(s(z))))))))"
-    )) {
-      runN[Int](3) { q =>
-        fib(5,q)
-      }
-    }
-    println("done")
-  }
-
-  test("fib2") {
-    table.clear; enabled = true 
-
-    expectResult(List(
-      "s(s(s(s(s(s(s(s(z))))))))"
-    )) {
-      runN[Int](3) { q =>
-        fib(5,q)
-      }
-    }
-    println("done")
-
-  }
 }
 
+
 // TODO: finish it up!
-class TestTabling2 extends FunSuite with ListBase with NatBase with Engine {
+trait Tabling2 extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
   type Cont = (() => Unit)
 
   val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
   val contTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.Set[Cont]] with scala.collection.mutable.MultiMap[String, Cont]
+
+  var enabled = true
+
+  def tabling(on: Boolean): Unit = {
+    ansTable.clear
+    contTable.clear
+    enabled = on
+  }
+
 
   def constrainAs(g: Exp[Any]): Answer = ??? // TODO!
 
@@ -1170,3 +1157,47 @@ class TestTabling2 extends FunSuite with ListBase with NatBase with Engine {
     }
   }
 }
+
+
+trait TestTablingBase extends FunSuite with ListBase with NatBase with TablingBase with Engine {
+
+  def fib(x:Exp[Int], y:Exp[Int]): Rel = memo(term("fib",List(x,y))) {
+    (x === 0) && (y === 1) ||
+    (x === 1) && (y === 1) || {
+      val x1,x2,y1,y2 = fresh[Int]
+      (x === succ(x1)) && (x === (succ(succ(x2)))) &&
+      fib(x1,y1) && fib(x2,y2) &&
+      add(y1,y2,y)
+    }
+  }
+
+
+  test("fib1") {
+    expectResult(List(
+      "s(s(s(s(s(s(s(s(z))))))))"
+    )) {
+      runN[Int](3) { q =>
+        tabling(false)
+        fib(5,q)
+      }
+    }
+    println("done")
+  }
+
+  test("fib2") {
+    expectResult(List(
+      "s(s(s(s(s(s(s(s(z))))))))"
+    )) {
+      runN[Int](3) { q =>
+        tabling(true)
+        fib(5,q)
+      }
+    }
+    println("done")
+
+  }
+}
+
+class TestTabling1 extends TestTablingBase with Tabling1
+
+class TestTabling2 extends TestTablingBase with Tabling2

@@ -1127,13 +1127,44 @@ trait Tabling2 extends TablingBase {
 
 
   def constrainAs(g1: Exp[Any]): Answer = { // TODO!
+    val lcstore = cstore
+    val lcindex = cindex
+    val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+
     val k1 = extractStr(g1)
     (g2: Exp[Any]) => {
-      val k1x = extractStr(g1)
+
+      val stack = new scala.collection.mutable.BitSet(varCount)
+      val seenVars= new scala.collection.mutable.HashMap[Int,Int]
+      def canon(x: Exp[Any]): Exp[Any] = {
+        val id = (Set(x.id) ++ (lcstore collect {
+          case IsEqual(`x`,y) if y.id < x.id => y.id
+          case IsEqual(y,`x`) if y.id < x.id => y.id
+        })).min
+        val mid = seenVars.getOrElseUpdate(id,seenVars.size)
+        Exp(mid)
+      }
+      def rec(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
+        case Some(IsTerm(id, key, args)) =>
+          assert(id == x.id)
+          assert(!stack.contains(id), "cyclic terms not handled")
+          try {
+            stack += id
+            term(key, args map rec)
+          } finally {
+            stack -= id
+          }
+        case _ =>
+          canon(x)
+      }
+
+      val g1x = rec(g1)
+      val k1x = extractStr(g1x)
       assert(k1x == k1, s"expect $k1 but got $k1x")
       val k2 = extractStr(g2)
       println(s"$k2 --> $k1")
-      g1 === g2
+
+      g1x === g2
     }
   }
 

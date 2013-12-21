@@ -1126,20 +1126,30 @@ trait Tabling2 extends TablingBase {
   }
 
 
-  def constrainAs(g: Exp[Any]): Answer = ??? // TODO!
+  def constrainAs(g1: Exp[Any]): Answer = { // TODO!
+    val k1 = extractStr(g1)
+    (g2: Exp[Any]) => {
+      val k1x = extractStr(g1)
+      assert(k1x == k1, s"expect $k1 but got $k1x")
+      val k2 = extractStr(g2)
+      println(s"$k2 --> $k1")
+      g1 === g2
+    }
+  }
 
   def memo(goal: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
     override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+      if (!enabled) return rec(() => a)(k)
       val key = extractStr(goal)
       contTable.addBinding(key, k)
       ansTable.get(key) match {
         case Some(answers) => 
-          println("found" + key)
-          for ((ansKey, ansConstr) <- answers) {
-            rec{() => ansConstr(goal); Yes}(k) // clean it up to ansConstr(goal, k)
+          //println("found " + key)
+          for ((ansKey, ansConstr) <- answers.toList) { // mutable!
+            rec{() => ansConstr(goal); Yes}(k) // clean it up to ansConstr(goal, k)?
           }
         case _ => 
-          println("not found: " + key)
+          println(key)
           val ansMap = new scala.collection.mutable.HashMap[String, Answer]
           ansTable(key) = ansMap
           rec(() => a) { () => 
@@ -1147,7 +1157,7 @@ trait Tabling2 extends TablingBase {
             ansMap.get(ansKey) match {
               case None => println("answer for "+key+": " + ansKey) 
                 ansMap(ansKey) = constrainAs(goal)
-                for (cont <- contTable(key)) {
+                for (cont <- contTable(key).toList) { // mutable!
                   cont()
                 }
               case Some(_) => // fail

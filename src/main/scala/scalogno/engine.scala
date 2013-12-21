@@ -206,16 +206,13 @@ trait Engine extends Base {
     val idx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
     val stack = new scala.collection.mutable.BitSet(varCount)
     val stack2 = new scala.collection.mutable.BitSet(varCount)
-    var seenVars: Map[Int,Int] = Map.empty
+    val seenVars= new scala.collection.mutable.HashMap[Int,Int]
     def canon(x: Exp[Any]): String = {
       val id = (Set(x.id) ++ (cstore collect {
         case IsEqual(`x`,y) if y.id < x.id => y.id
         case IsEqual(y,`x`) if y.id < x.id => y.id
       })).min
-      val mid = seenVars.get(id) match {
-        case None => val mid = seenVars.size; seenVars = seenVars.updated(id, mid); mid
-        case Some(mid) => mid
-      }
+      val mid = seenVars.getOrElseUpdate(id,seenVars.size)
       "x"+mid
     }
     def rec(x: Exp[Any]): Unit = idx.getOrElse(x.id,Set.empty).headOption match {

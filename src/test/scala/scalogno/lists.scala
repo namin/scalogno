@@ -1108,11 +1108,10 @@ trait Tabling1 extends TablingBase {
 }
 
 
-// TODO: finish it up!
 trait Tabling2 extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[DVar[_], Any], (() => Unit))
+  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[DVar[_], Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
 
   val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
   val contTable = new scala.collection.mutable.HashMap[String, List[Cont]]
@@ -1136,7 +1135,7 @@ trait Tabling2 extends TablingBase {
 
       val stack = new scala.collection.mutable.BitSet(varCount)
       val seenVars= new scala.collection.mutable.HashMap[Int,Int]
-      def canon(x: Exp[Any]): Exp[Any] = {
+      def copyVar(x: Exp[Any]): Exp[Any] = {
         val id = (Set(x.id) ++ (lcstore collect {
           case IsEqual(`x`,y) if y.id < x.id => y.id
           case IsEqual(y,`x`) if y.id < x.id => y.id
@@ -1144,66 +1143,94 @@ trait Tabling2 extends TablingBase {
         val mid = seenVars.getOrElseUpdate(id,seenVars.size)
         Exp(mid)
       }
-      def rec(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
+      def copyTerm(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
         case Some(IsTerm(id, key, args)) =>
           assert(id == x.id)
           assert(!stack.contains(id), "cyclic terms not handled")
           try {
             stack += id
-            term(key, args map rec)
+            term(key, args map copyTerm)
           } finally {
             stack -= id
           }
         case _ =>
-          canon(x)
+          copyVar(x)
       }
 
-      val g1x = rec(g1)
+      val g1x = copyTerm(g1)
       val k1x = extractStr(g1x)
-      assert(k1x == k1, s"expect $k1 but got $k1x")
+      //assert(k1x == k1, s"expect $k1 but got $k1x") disabled for dvar init: default might not be written yet
       val k2 = extractStr(g2)
-      println(s"$k2 --> $k1")
+      //println(s"$k2 --> $k1")
 
       g1x === g2
     }
   }
 
-  def memo(goal: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
+  def memo(goal0: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
     override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
       if (!enabled) return rec(() => a)(k)
-      def invoke(c: Cont, a: Answer) = {
-        val (goal1, cstore1, cindex1, dvars1, k1) = c
-        rec{ () => cstore = cstore1; cindex = cindex1; dvars = dvars1; a(goal1); Yes }(k1)
+
+      val dvarsRange = (0 until 2).toList // FIXME / HACK: hardcoded range of dyn var ids we consider
+      def dvarsSet(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k.id)) }
+      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k.id) } 
+
+      def invoke(cont: Cont, a: Answer) = {
+        val (goal1, cstore1, cindex1, dvars1, ldvars0, ldvars1, k1) = cont
+        rec{ () => 
+          // reset state to state at call
+          cstore = cstore1; cindex = cindex1; dvars = dvars1
+          // equate actual state with symbolic before state
+          dvarsEqu(ldvars0)
+          // load constraints from answer
+          a(goal1); 
+          // update actual state to symbolic after state
+          dvarsSet(ldvars1)
+          Yes 
+        }(k1)
       }
 
-      val key = extractStr(goal)
-      val cont = (goal,cstore,cindex,dvars,k)
+      val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
+      val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
+
+      // extend goal with symbolic state before and after
+      val goal = term("goal",List(goal0, term("state0", ldvars0), term("state1", ldvars1)))
+
+      // but disregard state for memoization (compute key for goal0)
+      val key = extractStr(goal0)
+
+      val cont = (goal,cstore,cindex,dvars,ldvars0,ldvars1,k) // save complete call state
       contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
         case Some(answers) => 
           //println("found " + key)
-          for ((ansKey, ansConstr) <- answers.toList) // mutable!
+          for ((ansKey, ansConstr) <- answers.toList) // mutable! convert to list
             invoke(cont,ansConstr)
         case _ => 
           println(key)
           val ansMap = new scala.collection.mutable.HashMap[String, Answer]
           ansTable(key) = ansMap
-          // XX what about dvars modified from a?
-          // we should capture the delta and have constrainAs
-          // replay the modifications
-          rec(() => a) { () => 
-            val ansKey = extractStr(goal)
+          rec { () => 
+            // evaluate goal with symbolic before state, to obtain rep of state after
+            dvarsSet(ldvars0)
+            a 
+          } { () => 
+            // constraint symbolic after state
+            dvarsEqu(ldvars1)
+            // disregard state again for memoization
+            val ansKey = extractStr(goal0) 
             ansMap.get(ansKey) match {
-              case None => println("answer for "+key+": " + ansKey)
+              case None => 
+                println("answer for "+key+": " + ansKey)
                 val ansConstr = constrainAs(goal)
                 ansMap(ansKey) = ansConstr
                 var i = 0
                 for (cont1 <- contTable(key).reverse) {
-                  println("call cont "+i+" with "+key+" -> "+ansKey); i+=1
+                  //println("call cont "+i+" with "+key+" -> "+ansKey); i+=1
                   invoke(cont1,ansConstr)
                 }
               case Some(_) => // fail
-                println("answer for "+key+": " + ansKey + " (duplicate)") 
+                //println("answer for "+key+": " + ansKey + " (duplicate)") 
             }
           }
       }
@@ -1304,12 +1331,13 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
 
   test("pathRT") {
     expectResult(List(
-      "pair(b,cons(a,cons(b,nil)))",
-      "pair(c,...)",
-      "pair(a,...)"
+      "pair(b,cons(path(a,b),nil))", 
+      "pair(c,cons(path(b,c),cons(path(a,c),nil)))", 
+      "pair(a,cons(path(c,a),cons(path(b,a),cons(path(a,a),nil))))"
     )) {
       runN[(String,List[String])](5) { case Pair(q1,q2) =>
         tabling(true)
+        globalTrace := nil
         pathRT("a",q1) && globalTrace() === q2
       }
     }
@@ -1318,12 +1346,13 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
 
   test("pathLT") {
     expectResult(List(
-      "pair(b,cons(a,cons(b,nil)))",
-      "pair(c,...)",
-      "pair(a,...)"
+      "pair(b,cons(path(a,b),nil))",
+      "pair(c,cons(path(a,b),cons(path(a,c),nil)))",
+      "pair(a,cons(path(a,b),cons(path(a,c),cons(path(a,a),nil))))"
     )) {
       runN[(String,List[String])](5) { case Pair(q1,q2) =>
         tabling(true)
+        globalTrace := nil
         pathLT("a",q1) && globalTrace() === q2
       }
     }

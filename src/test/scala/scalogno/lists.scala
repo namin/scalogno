@@ -1181,7 +1181,6 @@ trait TestTablingBase extends FunSuite with ListBase with NatBase with TablingBa
     }
   }
 
-
   test("fib1") {
     expectResult(List(
       "s(s(s(s(s(s(s(s(z))))))))"
@@ -1204,10 +1203,48 @@ trait TestTablingBase extends FunSuite with ListBase with NatBase with TablingBa
       }
     }
     println("done")
-
   }
+
 }
 
 class TestTabling1 extends TestTablingBase with Tabling1
 
-class TestTabling2 extends TestTablingBase with Tabling2
+class TestTabling2 extends TestTablingBase with Tabling2 {
+
+  def edge(x:Exp[String],y:Exp[String]) = 
+    (x === "a") && (y === "b") ||
+    (x === "b") && (y === "c") ||
+    (x === "c") && (y === "a")
+
+  def pathL(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
+    edge(a,b) || exists[String] { z => pathL(a,z) && edge(z,b) }
+  }
+  def pathR(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
+    edge(a,b) || exists[String] { z => edge(a,z) && pathR(z,b) }
+  }
+
+  test("path1") {
+    expectResult(List(
+      "XX"
+    )) {
+      runN[String](5) { q1 =>
+        tabling(true)
+        pathL("a",q1)
+      }
+    }
+    println("done")
+  }
+
+  test("path2") {
+    expectResult(List(
+      "XX"
+    )) {
+      runN[String](5) { q1 =>
+        tabling(true)
+        pathR("a",q1)
+      }
+    }
+    println("done")
+  }
+
+}

@@ -1266,7 +1266,19 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
     edge(a,b) || exists[String] { z => edge(a,z) && pathR(z,b) }
   }
 
-  test("path1") {
+  val globalTrace = DVar(nil: Exp[List[List[String]]])
+
+  def pathLT(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
+    globalTrace := cons(term("path",List(a,b)), globalTrace())
+    edge(a,b) || exists[String] { z => pathLT(a,z) && { println("--"+extractStr(term("path-edge",List(a,z,b)))); edge(z,b) } }
+  }
+  def pathRT(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
+    globalTrace := cons(term("path",List(a,b)), globalTrace())
+    edge(a,b) || exists[String] { z => edge(a,z) && pathRT(z,b) }
+  }
+
+
+  test("pathR") {
     expectResult(List(
       "b","c","a"
     )) {
@@ -1278,7 +1290,7 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
     println("done")
   }
 
-  test("path2") {
+  test("pathL") {
     expectResult(List(
       "b","c","a"
     )) {
@@ -1290,4 +1302,31 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
     println("done")
   }
 
+  test("pathRT") {
+    expectResult(List(
+      "pair(b,cons(a,cons(b,nil)))",
+      "pair(c,...)",
+      "pair(a,...)"
+    )) {
+      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+        tabling(true)
+        pathRT("a",q1) && globalTrace() === q2
+      }
+    }
+    println("done")
+  }
+
+  test("pathLT") {
+    expectResult(List(
+      "pair(b,cons(a,cons(b,nil)))",
+      "pair(c,...)",
+      "pair(a,...)"
+    )) {
+      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+        tabling(true)
+        pathLT("a",q1) && globalTrace() === q2
+      }
+    }
+    println("done")
+  }
 }

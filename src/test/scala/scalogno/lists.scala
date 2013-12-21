@@ -1112,10 +1112,10 @@ trait Tabling1 extends TablingBase {
 trait Tabling2 extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  type Cont = (() => Unit)
+  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[DVar[_], Any], (() => Unit))
 
   val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
-  val contTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.Set[Cont]] with scala.collection.mutable.MultiMap[String, Cont]
+  val contTable = new scala.collection.mutable.HashMap[String, List[Cont]]
 
   var enabled = true
 
@@ -1171,15 +1171,19 @@ trait Tabling2 extends TablingBase {
   def memo(goal: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
     override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
       if (!enabled) return rec(() => a)(k)
+      def invoke(c: Cont, a: Answer) = {
+        val (goal1, cstore1, cindex1, dvars1, k1) = c
+        rec{ () => cstore = cstore1; cindex = cindex1; dvars = dvars1; a(goal1); Yes }(k1)
+      }
+
       val key = extractStr(goal)
-      println("reg cont "+key)
-      contTable.addBinding(key, k)
+      val cont = (goal,cstore,cindex,dvars,k)
+      contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
         case Some(answers) => 
           //println("found " + key)
-          for ((ansKey, ansConstr) <- answers.toList) { // mutable!
-            rec{() => ansConstr(goal); Yes}(k) // clean it up to ansConstr(goal, k)?
-          }
+          for ((ansKey, ansConstr) <- answers.toList) // mutable!
+            invoke(cont,ansConstr)
         case _ => 
           println(key)
           val ansMap = new scala.collection.mutable.HashMap[String, Answer]
@@ -1190,12 +1194,13 @@ trait Tabling2 extends TablingBase {
           rec(() => a) { () => 
             val ansKey = extractStr(goal)
             ansMap.get(ansKey) match {
-              case None => println("answer for "+key+": " + ansKey) 
-                ansMap(ansKey) = constrainAs(goal)
+              case None => println("answer for "+key+": " + ansKey)
+                val ansConstr = constrainAs(goal)
+                ansMap(ansKey) = ansConstr
                 var i = 0
-                for (cont <- contTable(key).toList) { // mutable!
+                for (cont1 <- contTable(key).reverse) {
                   println("call cont "+i+" with "+key+" -> "+ansKey); i+=1
-                  try { cont() } catch { case _ => println("fail!!") }
+                  invoke(cont1,ansConstr)
                 }
               case Some(_) => // fail
                 println("answer for "+key+": " + ansKey + " (duplicate)") 

@@ -1172,6 +1172,7 @@ trait Tabling2 extends TablingBase {
     override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
       if (!enabled) return rec(() => a)(k)
       val key = extractStr(goal)
+      println("reg cont "+key)
       contTable.addBinding(key, k)
       ansTable.get(key) match {
         case Some(answers) => 
@@ -1183,15 +1184,21 @@ trait Tabling2 extends TablingBase {
           println(key)
           val ansMap = new scala.collection.mutable.HashMap[String, Answer]
           ansTable(key) = ansMap
+          // XX what about dvars modified from a?
+          // we should capture the delta and have constrainAs
+          // replay the modifications
           rec(() => a) { () => 
             val ansKey = extractStr(goal)
             ansMap.get(ansKey) match {
               case None => println("answer for "+key+": " + ansKey) 
                 ansMap(ansKey) = constrainAs(goal)
+                var i = 0
                 for (cont <- contTable(key).toList) { // mutable!
-                  cont()
+                  println("call cont "+i+" with "+key+" -> "+ansKey); i+=1
+                  try { cont() } catch { case _ => println("fail!!") }
                 }
               case Some(_) => // fail
+                println("answer for "+key+": " + ansKey + " (duplicate)") 
             }
           }
       }
@@ -1247,8 +1254,17 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
     (x === "b") && (y === "c") ||
     (x === "c") && (y === "a")
 
+
+  // ab
+  // ab+bc=ac
+  // ac+ca=aa <-- swallowed: continuation is invoked from inside itself
+  //                  what happens: 1) call continuation of inner pathL call with z="b",
+  //                                   derive pathL(a,c) as result 
+  //                                2) call continuation again, trying to bind z="c"
+  //
+
   def pathL(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
-    edge(a,b) || exists[String] { z => pathL(a,z) && edge(z,b) }
+    edge(a,b) || exists[String] { z => pathL(a,z) && { println("--"+a+z+b+extractStr(term("path-edge",List(a,z,b)))); edge(z,b) } }
   }
   def pathR(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
     edge(a,b) || exists[String] { z => edge(a,z) && pathR(z,b) }
@@ -1256,23 +1272,24 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
 
   test("path1") {
     expectResult(List(
-      "XX"
+      "b","c","a"
     )) {
       runN[String](5) { q1 =>
         tabling(true)
-        pathL("a",q1)
+        pathR("a",q1)
       }
     }
     println("done")
   }
 
   test("path2") {
+    println("------------------")
     expectResult(List(
-      "XX"
+      "b","c","a"
     )) {
       runN[String](5) { q1 =>
         tabling(true)
-        pathR("a",q1)
+        pathL("a",q1) && { println("top"); Yes }
       }
     }
     println("done")

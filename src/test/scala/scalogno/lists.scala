@@ -1259,17 +1259,8 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
     (x === "b") && (y === "c") ||
     (x === "c") && (y === "a")
 
-
-  // ab
-  // ab+bc=ac
-  // ac+ca=aa <-- swallowed: continuation is invoked from inside itself
-  //                  what happens: 1) call continuation of inner pathL call with z="b",
-  //                                   derive pathL(a,c) as result 
-  //                                2) call continuation again, trying to bind z="c"
-  //
-
   def pathL(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
-    edge(a,b) || exists[String] { z => pathL(a,z) && { println("--"+a+z+b+extractStr(term("path-edge",List(a,z,b)))); edge(z,b) } }
+    edge(a,b) || exists[String] { z => pathL(a,z) && { println("--"+extractStr(term("path-edge",List(a,z,b)))); edge(z,b) } }
   }
   def pathR(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
     edge(a,b) || exists[String] { z => edge(a,z) && pathR(z,b) }
@@ -1288,13 +1279,12 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
   }
 
   test("path2") {
-    println("------------------")
     expectResult(List(
       "b","c","a"
     )) {
       runN[String](5) { q1 =>
         tabling(true)
-        pathL("a",q1) && { println("top"); Yes }
+        pathL("a",q1)
       }
     }
     println("done")

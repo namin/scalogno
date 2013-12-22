@@ -1171,7 +1171,7 @@ trait Tabling2 extends TablingBase {
     override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
       if (!enabled) return rec(() => a)(k)
 
-      val dvarsRange = (0 until 2).toList // FIXME / HACK: hardcoded range of dyn var ids we consider
+      val dvarsRange = (0 until dvarCount).toList
       def dvarsSet(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k.id)) }
       def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k.id) } 
 
@@ -1337,7 +1337,6 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
     )) {
       runN[(String,List[String])](5) { case Pair(q1,q2) =>
         tabling(true)
-        globalTrace := nil
         pathRT("a",q1) && globalTrace() === q2
       }
     }
@@ -1352,7 +1351,6 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
     )) {
       runN[(String,List[String])](5) { case Pair(q1,q2) =>
         tabling(true)
-        globalTrace := nil
         pathLT("a",q1) && globalTrace() === q2
       }
     }

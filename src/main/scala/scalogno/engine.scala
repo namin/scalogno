@@ -51,17 +51,21 @@ trait Base {
   val cstore0: Set[Constraint] = Set.empty
   var cstore: Set[Constraint] = cstore0
   var cindex: Map[Int, Set[Constraint]] = Map.empty withDefaultValue Set.empty
-  val dvars0: Map[DVar[_], Any] = Map.empty withDefault { case DVar(id,v) => v }
+  val dvars0: Map[DVar[_], Any] = Map.empty //withDefault { case DVar(id,v) => v }
   var dvars: Map[DVar[_], Any] = dvars0
 
   case class DVar[T](id: Int, default: T) extends (() => T) {
+    dvar_set(this,default)
     def apply() = dvar_get(this)
     def :=(v: T) = dvar_set(this, v)
   }
 
+  var dvarCount = 0
   def DVar[T](v: T): DVar[T] = {
+    // FIXME: error if we don't use varCount - why??
     val id = varCount
     varCount += 1
+    dvarCount = varCount
     new DVar[T](id, v)
   }
 

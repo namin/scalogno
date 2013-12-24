@@ -1161,7 +1161,7 @@ trait Tabling2 extends TablingBase {
       val k1x = extractStr(g1x)
       //assert(k1x == k1, s"expect $k1 but got $k1x") disabled for dvar init: default might not be written yet
       val k2 = extractStr(g2)
-      //println(s"$k2 --> $k1")
+      println(s"$k2 --> $k1")
 
       g1x === g2
     }
@@ -1356,4 +1356,114 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
     }
     println("done")
   }
+
+}
+
+
+class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 with Engine {
+
+  val accum = DVar(nil: Exp[List[String]])
+  def inc(n: Exp[Int]): Rel = {
+    (n === 0) || exists[Int] { n1 => 
+      (n === succ(n1)) && {
+        accum := cons("A", accum())
+        inc(n1)
+      }  
+    }
+  }
+
+  test("stateRel1") {
+    expectResult(List(
+      "pair(x0,cons(A,cons(A,cons(A,x0))))"
+    )) {
+      runN[(List[String],List[String])](5) { case Pair(q1,q2) =>
+        tabling(false)
+        accum := q1
+        inc(3) && accum() === q2
+      }
+    }
+    println("done")
+  }
+
+  test("stateRel2") {
+    expectResult(List(
+      "pair(z,pair(x0,x0))", 
+      "pair(s(z),pair(x0,cons(A,x0)))", 
+      "pair(s(s(z)),pair(x0,cons(A,cons(A,x0))))", 
+      "pair(s(s(s(z))),pair(x0,cons(A,cons(A,cons(A,x0)))))", 
+      "pair(s(s(s(s(z)))),pair(x0,cons(A,cons(A,cons(A,cons(A,x0))))))"
+    )) {
+      runN[(Int,(List[String],List[String]))](5) { case Pair(q1,Pair(q2,q3)) =>
+        tabling(false)
+        accum := q2
+        inc(q1) && accum() === q3
+      }
+    }
+    println("done")
+  }
+
+  test("stateRel3") {
+    expectResult(List(
+      "pair(z,cons(A,cons(A,cons(A,cons(A,nil)))))", 
+      "pair(s(z),cons(A,cons(A,cons(A,nil))))", 
+      "pair(s(s(z)),cons(A,cons(A,nil)))", 
+      "pair(s(s(s(z))),cons(A,nil))", 
+      "pair(s(s(s(s(z)))),nil)"
+    )) {
+      runN[(Int,List[String])](5) { case Pair(q1,q2) =>
+        tabling(false)
+        accum := q2
+        inc(q1) && accum() === List("A","A","A","A")
+      }
+    }
+    println("done")
+  }
+
+
+  test("stateRel1T") {
+    expectResult(List(
+      "pair(x0,cons(A,cons(A,cons(A,x0))))"
+    )) {
+      runN[(List[String],List[String])](5) { case Pair(q1,q2) =>
+        tabling(true)
+        accum := q1
+        inc(3) && accum() === q2
+      }
+    }
+    println("done")
+  }
+
+  test("stateRel2T") {
+    expectResult(List(
+      "pair(z,pair(x0,x0))", 
+      "pair(s(z),pair(x0,cons(A,x0)))", 
+      "pair(s(s(z)),pair(x0,cons(A,cons(A,x0))))", 
+      "pair(s(s(s(z))),pair(x0,cons(A,cons(A,cons(A,x0)))))", 
+      "pair(s(s(s(s(z)))),pair(x0,cons(A,cons(A,cons(A,cons(A,x0))))))"
+    )) {
+      runN[(Int,(List[String],List[String]))](5) { case Pair(q1,Pair(q2,q3)) =>
+        tabling(true)
+        accum := q2
+        inc(q1) && accum() === q3
+      }
+    }
+    println("done")
+  }
+
+  test("stateRel3T") {
+    expectResult(List(
+      "pair(z,cons(A,cons(A,cons(A,cons(A,nil)))))", 
+      "pair(s(z),cons(A,cons(A,cons(A,nil))))", 
+      "pair(s(s(z)),cons(A,cons(A,nil)))", 
+      "pair(s(s(s(z))),cons(A,nil))", 
+      "pair(s(s(s(s(z)))),nil)"
+    )) {
+      runN[(Int,List[String])](5) { case Pair(q1,q2) =>
+        tabling(true)
+        accum := q2
+        inc(q1) && accum() === List("A","A","A","A")
+      }
+    }
+    println("done")
+  }  
 }

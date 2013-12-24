@@ -51,27 +51,25 @@ trait Base {
   val cstore0: Set[Constraint] = Set.empty
   var cstore: Set[Constraint] = cstore0
   var cindex: Map[Int, Set[Constraint]] = Map.empty withDefaultValue Set.empty
-  val dvars0: Map[DVar[_], Any] = Map.empty //withDefault { case DVar(id,v) => v }
-  var dvars: Map[DVar[_], Any] = dvars0
+  val dvars0: Map[Int, Any] = Map.empty //withDefault { case DVar(id,v) => v }
+  var dvars: Map[Int, Any] = dvars0
 
   case class DVar[T](id: Int, default: T) extends (() => T) {
-    dvar_set(this,default)
-    def apply() = dvar_get(this)
-    def :=(v: T) = dvar_set(this, v)
+    dvar_set(id,default)
+    def apply() = dvar_get[T](id)
+    def :=(v: T) = dvar_set(id, v)
   }
 
-  var dvarCount = 0
+  var dvarCount = 1 // FIXME: breaks if we start at 0 -- why?
   def DVar[T](v: T): DVar[T] = {
-    // FIXME: error if we don't use varCount - why??
-    val id = varCount
-    varCount += 1
-    dvarCount = varCount
+    val id = dvarCount
+    dvarCount += 1
     new DVar[T](id, v)
   }
 
-  def dvar_set[T](id: DVar[T], v: T): Unit = dvars += id -> v
-  def dvar_get[T](id: DVar[T]): T = dvars(id).asInstanceOf[T]
-  def dvar_upd[T](id: DVar[T])(f: T => T): Unit = dvars += id -> f(dvar_get(id))
+  def dvar_set[T](id: Int, v: T): Unit = dvars += id -> v
+  def dvar_get[T](id: Int): T = dvars(id).asInstanceOf[T]
+  def dvar_upd[T](id: Int)(f: T => T): Unit = dvars += id -> f(dvar_get(id))
 
   def register(c: Constraint): Unit = {
     if (cstore.contains(c)) return
@@ -200,7 +198,7 @@ trait Engine extends Base {
     } catch {
       case Done => // OK
     } finally {
-      varCount = varCount1
+      //varCount = varCount1
     }
 
     res.toList

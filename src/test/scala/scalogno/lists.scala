@@ -1111,7 +1111,7 @@ trait Tabling1 extends TablingBase {
 trait Tabling2 extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[DVar[_], Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
+  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
 
   val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
   val contTable = new scala.collection.mutable.HashMap[String, List[Cont]]
@@ -1172,8 +1172,8 @@ trait Tabling2 extends TablingBase {
       if (!enabled) return rec(() => a)(k)
 
       val dvarsRange = (0 until dvarCount).toList
-      def dvarsSet(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k.id)) }
-      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k.id) } 
+      def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
+      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) } 
 
       def invoke(cont: Cont, a: Answer) = {
         val (goal1, cstore1, cindex1, dvars1, ldvars0, ldvars1, k1) = cont

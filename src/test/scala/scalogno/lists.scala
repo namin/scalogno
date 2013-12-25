@@ -1372,6 +1372,45 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
     }
   }
 
+  def dlet[T](p: (DVar[T],T))(body: =>Rel): Rel = new Custom("dlet") {
+    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+      val (v,x) = p
+      val old = v()
+      v := x
+      rec(() => body) { () => v := old; k() }
+    }
+  }
+
+  val last = DVar(nil: Exp[List[String]])
+  def inc2(n: Exp[Int]): Rel = {
+    (n === 0) && (accum() === last()) ||
+    exists[Int] { n1 => 
+      (n === succ(n1)) && exists[List[String]] { tail =>
+        accum() === cons("A", tail) && dlet(accum -> tail) {
+          inc2(n1)
+        }
+      }  
+    }
+  }
+
+
+  test("dletRel1") {
+    expectResult(List(
+      "pair(x0,cons(A,cons(A,cons(A,x0))))"
+    )) {
+      runN[(List[String],List[String])](5) { case Pair(q1,q2) =>
+        tabling(false)
+        dlet(last -> q1) { 
+          dlet(accum -> q2) {
+            inc2(3)
+          }
+        }
+      }
+    }
+    println("done")
+  }
+
+
   test("stateRel1") {
     expectResult(List(
       "pair(x0,cons(A,cons(A,cons(A,x0))))"

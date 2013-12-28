@@ -61,12 +61,19 @@ trait NatBase extends InjectBase with Ordering {
 
 
 trait ListBase extends InjectBase with NatBase with Ordering {
+  implicit def injectPair[T:Inject,U:Inject] = new Inject[(T,U)] {
+    def toTerm(x: (T,U)): Exp[(T,U)] = pair(x._1,x._2)
+  }
   implicit def injectList[T:Inject] = new Inject[List[T]] {
     def toTerm(x: List[T]): Exp[List[T]] = list(x:_*)
   }
   implicit def ordList[T:Ord] = new Ord[List[T]] {
     def lt(x:Exp[List[T]],y:Exp[List[T]]): Rel = lessLex[T]((a1,a2) => a1 < a2, x,y)
   }
+
+  implicit def injectPairShallow[T,U](x: (Exp[T],Exp[U])) = pair(x._1,x._2)
+  implicit def injectListShallow[T](xs: List[Exp[T]]): Exp[List[T]] = if (xs.isEmpty) nil else cons(xs.head,xs.tail)
+
 
   def list[T:Inject](xs: T*): Exp[List[T]] = if (xs.isEmpty) nil else cons(inject(xs.head),list(xs.tail:_*))
 
@@ -91,6 +98,11 @@ trait ListBase extends InjectBase with NatBase with Ordering {
     }
   }
 
+
+  def contains[T](xs: Exp[List[T]], y:Exp[T]): Rel =
+    exists[T,List[T]] { (x,xs1) =>
+      xs === cons(x,xs1) && (x === y || contains(xs1,y))
+    }
 
   def append[T](as: Exp[List[T]], bs: Exp[List[T]], cs: Exp[List[T]]): Rel =
     (as === nil && bs === cs) ||
@@ -575,20 +587,14 @@ class TestLists extends FunSuite with Base with Engine with NatBase with ListBas
   test("map") {
     expectResult(List("cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))")) {
       run[List[String]] { q =>
-        map[String,String]((q1,q2) => q1 === q2 , list("a","b","c","d","e","f"), q)
+        map[String,String]((u,v) => u === v, list("a","b","c","d","e","f"), q)
 
       }
     }
-    def elems = (List("a","b","c","d","e","f") map (term(_,Nil)),List("A","B","C","A","B","C") map (term(_,Nil))).zipped map (pair(_,_))
-    def f(xs:List[Exp[(String,String)]])(e1:Exp[String],e2:Exp[String]): Rel = xs match {
-      case Nil => No
-      case x::xs => 
-        //println(extractStr(x))
-        (pair(e1,e2) === x) || f(xs)(e1,e2)
-    }
     expectResult(List("cons(A,cons(B,cons(C,cons(A,cons(B,cons(C,nil))))))")) {
       run[List[String]] { q =>
-        map[String,String](f(elems), list("a","b","c","d","e","f"), q)
+        val elems = (List("a","b","c","d","e","f") zip List("A","B","C","A","B","C")): Exp[List[(String,String)]]
+        map[String,String]((u,v) => contains(elems,(u,v)), list("a","b","c","d","e","f"), q)
       }
     }
     expectResult(List(

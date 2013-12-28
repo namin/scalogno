@@ -116,6 +116,12 @@ trait ListBase extends InjectBase with NatBase with Ordering {
       (as === cons(a,as1)) && f(a,b) && (bs === cons(b,bs1)) && map[T,U](f,as1,bs1)
     }
 
+  def mapf[T,U](as: Exp[List[T]], f: (Exp[T],Exp[U]) => Rel): Exp[List[U]] = {
+    val bs = fresh[List[U]]
+    map(f,as,bs) // needs delayed mode
+    bs
+  }
+
   def flatMap[T,U](f: (Exp[T],Exp[List[U]]) => Rel, as: Exp[List[T]], cs: Exp[List[U]]): Rel =
     (as === nil) && (cs === nil) ||
     exists[T,List[U],List[T],List[U]] { (a,bs,as1,cs1) =>
@@ -608,11 +614,50 @@ class TestLists extends FunSuite with Base with Engine with NatBase with ListBas
       "cons(d,cons(e,cons(d,nil)))"
     )){
       run[List[String]] { q =>
-        map[String,String](f(elems), q, list("A","B","A"))
+        val elems = (List("a","b","c","d","e","f") zip List("A","B","C","A","B","C")): Exp[List[(String,String)]]
+        map[String,String]((u,v) => contains(elems,(u,v)), q, list("A","B","A"))
       }
     }
   }
 
+  test("mapf") {
+    try {
+      delayedMode = true
+
+      expectResult(List("cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))")) {
+        run[List[String]] { q =>
+          val res = mapf[String,String](list("a","b","c","d","e","f"), (u,v) => u === v)
+          q === res
+        }
+      }
+      expectResult(List("cons(A,cons(B,cons(C,cons(A,cons(B,cons(C,nil))))))")) {
+        run[List[String]] { q =>
+          val elems = (List("a","b","c","d","e","f") zip List("A","B","C","A","B","C")): Exp[List[(String,String)]]
+          val res = mapf[String,String](list("a","b","c","d","e","f"), (u,v) => contains(elems,(u,v)))
+          q === res
+        }
+      }
+      expectResult(List(
+        "cons(a,cons(b,cons(a,nil)))", 
+        "cons(a,cons(b,cons(d,nil)))", 
+        "cons(a,cons(e,cons(a,nil)))", 
+        "cons(a,cons(e,cons(d,nil)))", 
+        "cons(d,cons(b,cons(a,nil)))", 
+        "cons(d,cons(b,cons(d,nil)))", 
+        "cons(d,cons(e,cons(a,nil)))", 
+        "cons(d,cons(e,cons(d,nil)))"
+      )){
+        run[List[String]] { q =>
+          val elems = (List("a","b","c","d","e","f") zip List("A","B","C","A","B","C")): Exp[List[(String,String)]]
+          val res = mapf[String,String](q, (u,v) => contains(elems,(u,v)))
+          res === list("A","B","A")
+        }
+      }
+
+    } finally {
+      delayedMode = false        
+    }
+  }
 
   test("flatMap") {
     expectResult(List("cons(a,cons(a,cons(b,cons(b,cons(c,cons(c,nil))))))")) {

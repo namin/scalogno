@@ -370,7 +370,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
     }
 
   // inject non-std interpretation by transforming rules reified as Or and And
-
+/*
   var inrule: List[String] = Nil
   def rule0[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
     { (a,b) => 
@@ -397,7 +397,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
         inrule = local.tail
       }
     }
-
+*/
 }
 
 

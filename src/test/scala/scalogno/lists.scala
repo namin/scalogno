@@ -1407,7 +1407,6 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
         }
       }
     }
-    println("done")
   }
 
 
@@ -1421,7 +1420,6 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
         inc(3) && accum() === q2
       }
     }
-    println("done")
   }
 
   test("stateRel2") {
@@ -1438,7 +1436,6 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
         inc(q1) && accum() === q3
       }
     }
-    println("done")
   }
 
   test("stateRel3") {
@@ -1455,7 +1452,6 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
         inc(q1) && accum() === List("A","A","A","A")
       }
     }
-    println("done")
   }
 
 
@@ -1469,7 +1465,6 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
         inc(3) && accum() === q2
       }
     }
-    println("done")
   }
 
   test("stateRel2T") {
@@ -1486,7 +1481,6 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
         inc(q1) && accum() === q3
       }
     }
-    println("done")
   }
 
   test("stateRel3T") {
@@ -1503,6 +1497,5 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
         inc(q1) && accum() === List("A","A","A","A")
       }
     }
-    println("done")
   }  
 }

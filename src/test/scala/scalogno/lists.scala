@@ -357,7 +357,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
   def globalTrace_=(x:Exp[List[List[String]]]) = globalTrace0 = x
 
   // inject non-std interpretation by overriding || and &&
-
+/*
   override def infix_||(a: => Rel, b: => Rel): Rel = {
     val localTrace = globalTrace()
     def reset(x: => Rel) = { globalTrace = localTrace; x }
@@ -368,7 +368,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
     def reset(x: => Rel) = { globalTrace = localTrace; x }
     super.infix_&&(reset(a),b) // do not reset b
   }
-
+*/
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
     { (a,b) => 
       globalTrace = cons(term(s,List(a,b)),globalTrace()); 
@@ -709,7 +709,7 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with ListBas
     expectResult(List(
       "branch(branch(branch(nil,s(z),a,nil),s(s(z)),b,nil),s(s(s(z))),c,branch(nil,s(s(s(s(z)))),d,nil))"
     )) {
-      run[List[String]] { q =>
+      run[Tree[Int,String]] { q =>
         q === tree(1 -> "a", 2 -> "b", 3 -> "c", 4 -> "d")
       }
     }
@@ -821,7 +821,7 @@ trait TestGraphsBase extends FunSuite with Base with Engine with NatBase with Li
       "pair(b,cons(path(a,b),cons(path(c,b),cons(path(b,b),cons(path(a,b),nil)))))", 
       "pair(c,cons(path(b,c),cons(path(a,c),cons(path(c,c),cons(path(b,c),cons(path(a,c),nil))))))"
     )) {
-      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+      runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
         traceG.path("a",q1) && globalTrace() === q2
       }
     }
@@ -1386,7 +1386,7 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
       "pair(c,cons(path(b,c),cons(path(a,c),nil)))", 
       "pair(a,cons(path(c,a),cons(path(b,a),cons(path(a,a),nil))))"
     )) {
-      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+      runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
         tabling(true)
         pathRT("a",q1) && globalTrace() === q2
       }
@@ -1400,7 +1400,7 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
       "pair(c,cons(path(a,b),cons(path(a,c),nil)))",
       "pair(a,cons(path(a,b),cons(path(a,c),cons(path(a,a),nil))))"
     )) {
-      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+      runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
         tabling(true)
         pathLT("a",q1) && globalTrace() === q2
       }
@@ -1550,3 +1550,6 @@ class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 wit
     }
   }  
 }
+
+
+

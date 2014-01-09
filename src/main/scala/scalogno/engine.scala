@@ -128,25 +128,25 @@ trait Base {
     cnew foreach register
   }
 
-  def infix_===[T](a: => Exp[T], b: => Exp[T]): Rel = {
+  def xinfix_===[T](a: => Exp[T], b: => Exp[T]): Rel = {
     val c = IsEqual(a,b)    
     //reflectCmd(Reg(c)) delayed mode may still want eager constraints
     register(c)
     TSX(Yes)
   }
   implicit class ExpOps[T](a: Exp[T]) {
-    def ===(b: Exp[T]) = infix_===(a,b)
+    def ===[U](b: Exp[U]) = xinfix_===(a,b)
   }
 
-  def infix_&&(a: => Rel, b: => Rel): Rel = {
+  def xinfix_&&(a: => Rel, b: => Rel): Rel = {
     And(() => a,() => b)
   }
-  def infix_||(a: => Rel, b: => Rel): Rel = {
+  def xinfix_||(a: => Rel, b: => Rel): Rel = {
     Or(() => a,() => b)
   }
   implicit class RelOps(a: => Rel) {
-    def &&(b: => Rel) = infix_&&(a,b)
-    def ||(b: => Rel) = infix_||(a,b)
+    def &&(b: => Rel) = xinfix_&&(a,b)
+    def ||(b: => Rel) = xinfix_||(a,b)
   }
 
   def term[T](key: String, args: List[Exp[Any]]): Exp[T] = {
@@ -174,6 +174,9 @@ trait Base {
   }
   def exists[T,U,V,W,X,Y](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X],Exp[Y]) => Rel): Rel = {
     f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X],fresh[Y])
+  }
+  def exists[T,U,V,W,X,Y,Z](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X],Exp[Y],Exp[Z]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X],fresh[Y],fresh[Z])
   }
 }
 

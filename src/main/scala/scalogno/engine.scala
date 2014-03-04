@@ -12,16 +12,54 @@ trait Base {
   abstract class Constraint
   case class IsTerm(id: Int, key: String, args: List[Exp[Any]]) extends Constraint
   case class IsEqual(x: Exp[Any], y: Exp[Any]) extends Constraint
-  abstract class Rel
-  case class Or(x: () => Rel, y: () => Rel) extends Rel
-  case class And(x: () => Rel, y: () => Rel) extends Rel
-  case class Custom(s:String) extends Rel {
+
+  abstract class Cmd
+  case class Or(x: () => Rel, y: () => Rel) extends Cmd
+  case class And(x: () => Rel, y: () => Rel) extends Cmd
+  case class Reg(c: Constraint) extends Cmd
+  case class DGet[T](v: DVar[Exp[T]], x: Exp[T]) extends Cmd
+  case class DSet[T](v: DVar[Exp[T]], x: Exp[T]) extends Cmd
+  case class Custom(s:String) extends Cmd {
     def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
       k()
     }
   }
-  case object Yes extends Rel
-  case object No extends Rel
+  case object Yes extends Cmd
+  case object No extends Cmd
+
+  abstract class Rel
+  case class TSX(x:Cmd) extends Rel
+
+  var prog: Cmd = Yes
+
+  var delayedMode = false
+
+  implicit def reflectCmd(x:Cmd): Rel = {
+    if (delayedMode) {
+      val save = prog
+      val pushFront = x match { case Reg(c) => true case _ => false }
+      if (save == Yes) prog = x
+      else if (pushFront) prog = And(() => x, () => {prog = save; TSX(Yes)})
+      else prog = And(() => {prog = save; TSX(Yes)}, () => x)
+      TSX(Yes)
+    } else TSX(x)
+  }
+
+  def reifyCmd(x: => Rel): Cmd = {
+    val save = prog
+    try {
+      if (delayedMode) {
+        prog = Yes
+        x
+        prog
+      } else {
+        val TSX(r) = x
+        r
+      }
+    } finally prog = save
+  }
+
+
 
   def keys(c: Constraint): List[Int] = c match {
     case IsEqual(Exp(a),Exp(b)) => List(a,b)
@@ -51,27 +89,31 @@ trait Base {
   val cstore0: Set[Constraint] = Set.empty
   var cstore: Set[Constraint] = cstore0
   var cindex: Map[Int, Set[Constraint]] = Map.empty withDefaultValue Set.empty
-  val dvars0: Map[DVar[_], Any] = Map.empty //withDefault { case DVar(id,v) => v }
-  var dvars: Map[DVar[_], Any] = dvars0
+  val dvars0: Map[Int, Any] = Map.empty //withDefault { case DVar(id,v) => v }
+  var dvars: Map[Int, Any] = dvars0
 
   case class DVar[T](id: Int, default: T) extends (() => T) {
-    dvar_set(this,default)
-    def apply() = dvar_get(this)
-    def :=(v: T) = dvar_set(this, v)
+    dvar_set(id,default)
+    def apply(): T = if (delayedMode) {
+      val v = fresh[Any]
+      reflectCmd(DGet(this.asInstanceOf[DVar[Exp[Any]]],v))
+      v.asInstanceOf[T]
+    } else dvar_get(id)
+    def :=(v: T): Unit = if (delayedMode) {
+      reflectCmd(DSet(this.asInstanceOf[DVar[Exp[Any]]],v.asInstanceOf[Exp[Any]]))
+    } else dvar_set(id,v)
   }
 
-  var dvarCount = 0
+  var dvarCount = 1 // FIXME: breaks if we start at 0 -- why?
   def DVar[T](v: T): DVar[T] = {
-    // FIXME: error if we don't use varCount - why??
-    val id = varCount
-    varCount += 1
-    dvarCount = varCount
+    val id = dvarCount
+    dvarCount += 1
     new DVar[T](id, v)
   }
 
-  def dvar_set[T](id: DVar[T], v: T): Unit = dvars += id -> v
-  def dvar_get[T](id: DVar[T]): T = dvars(id).asInstanceOf[T]
-  def dvar_upd[T](id: DVar[T])(f: T => T): Unit = dvars += id -> f(dvar_get(id))
+  def dvar_set[T](id: Int, v: T): Unit = dvars += id -> v
+  def dvar_get[T](id: Int): T = dvars(id).asInstanceOf[T]
+  def dvar_upd[T](id: Int)(f: T => T): Unit = dvars += id -> f(dvar_get(id))
 
   def register(c: Constraint): Unit = {
     if (cstore.contains(c)) return
@@ -86,30 +128,32 @@ trait Base {
     cnew foreach register
   }
 
-  def infix_===[T](a: => Exp[T], b: => Exp[T]): Rel = {
-    val c = IsEqual(a,b)
+  def xinfix_===[T](a: => Exp[T], b: => Exp[T]): Rel = {
+    val c = IsEqual(a,b)    
+    //reflectCmd(Reg(c)) delayed mode may still want eager constraints
     register(c)
-    Yes
+    TSX(Yes)
   }
   implicit class ExpOps[T](a: Exp[T]) {
-    def ===(b: Exp[T]) = infix_===(a,b)
+    def ===[U](b: Exp[U]) = xinfix_===(a,b)
   }
 
-  def infix_&&(a: => Rel, b: => Rel): Rel = {
+  def xinfix_&&(a: => Rel, b: => Rel): Rel = {
     And(() => a,() => b)
   }
-  def infix_||(a: => Rel, b: => Rel): Rel = {
+  def xinfix_||(a: => Rel, b: => Rel): Rel = {
     Or(() => a,() => b)
   }
   implicit class RelOps(a: => Rel) {
-    def &&(b: => Rel) = infix_&&(a,b)
-    def ||(b: => Rel) = infix_||(a,b)
+    def &&(b: => Rel) = xinfix_&&(a,b)
+    def ||(b: => Rel) = xinfix_||(a,b)
   }
 
   def term[T](key: String, args: List[Exp[Any]]): Exp[T] = {
     val e = fresh[T]
     val c = IsTerm(e.id, key, args)
-    register(c)
+    //reflectCmd(Reg(c)) delayed mode may still want eager constraints
+    register(c)    
     e
   }
 
@@ -131,6 +175,9 @@ trait Base {
   def exists[T,U,V,W,X,Y](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X],Exp[Y]) => Rel): Rel = {
     f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X],fresh[Y])
   }
+  def exists[T,U,V,W,X,Y,Z](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X],Exp[Y],Exp[Z]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X],fresh[Y],fresh[Z])
+  }
 }
 
 trait Engine extends Base {
@@ -151,15 +198,24 @@ trait Engine extends Base {
       val dvars1 = dvars
       try {
         d += 1
-        e() match {
+        val c = reifyCmd(e())
+        c match {
           case g@Custom(s) =>
             g.run(rec)(f)
+          case Reg(c) =>
+            register(c)
+            f()
+          case DGet(v,x) =>
+            register(IsEqual(dvar_get(v.id),x))
+            f()
+          case DSet(v,x) =>
+            dvar_set(v.id,x)
+            f()
           case Or(a,b) =>
             rec(a)(f)
             rec(b)(f)
           case And(a,b) =>
             rec(a) { () =>
-              if (propagate())
                 rec(b)(f)
             }
           case Yes =>
@@ -200,7 +256,7 @@ trait Engine extends Base {
     } catch {
       case Done => // OK
     } finally {
-      varCount = varCount1
+      //varCount = varCount1
     }
 
     res.toList

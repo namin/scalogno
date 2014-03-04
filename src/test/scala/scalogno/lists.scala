@@ -61,12 +61,19 @@ trait NatBase extends InjectBase with Ordering {
 
 
 trait ListBase extends InjectBase with NatBase with Ordering {
+  implicit def injectPair[T:Inject,U:Inject] = new Inject[(T,U)] {
+    def toTerm(x: (T,U)): Exp[(T,U)] = pair(x._1,x._2)
+  }
   implicit def injectList[T:Inject] = new Inject[List[T]] {
     def toTerm(x: List[T]): Exp[List[T]] = list(x:_*)
   }
   implicit def ordList[T:Ord] = new Ord[List[T]] {
     def lt(x:Exp[List[T]],y:Exp[List[T]]): Rel = lessLex[T]((a1,a2) => a1 < a2, x,y)
   }
+
+  implicit def injectPairShallow[T,U](x: (Exp[T],Exp[U])) = pair(x._1,x._2)
+  implicit def injectListShallow[T](xs: List[Exp[T]]): Exp[List[T]] = if (xs.isEmpty) nil else cons(xs.head,xs.tail)
+
 
   def list[T:Inject](xs: T*): Exp[List[T]] = if (xs.isEmpty) nil else cons(inject(xs.head),list(xs.tail:_*))
 
@@ -92,6 +99,11 @@ trait ListBase extends InjectBase with NatBase with Ordering {
   }
 
 
+  def contains[T](xs: Exp[List[T]], y:Exp[T]): Rel =
+    exists[T,List[T]] { (x,xs1) =>
+      xs === cons(x,xs1) && (x === y || contains(xs1,y))
+    }
+
   def append[T](as: Exp[List[T]], bs: Exp[List[T]], cs: Exp[List[T]]): Rel =
     (as === nil && bs === cs) ||
     exists[T,List[T],List[T]] { (h,t1,t2) =>
@@ -103,6 +115,12 @@ trait ListBase extends InjectBase with NatBase with Ordering {
     exists[T,U,List[T],List[U]] { (a,b,as1,bs1) =>
       (as === cons(a,as1)) && f(a,b) && (bs === cons(b,bs1)) && map[T,U](f,as1,bs1)
     }
+
+  def mapf[T,U](as: Exp[List[T]], f: (Exp[T],Exp[U]) => Rel): Exp[List[U]] = {
+    val bs = fresh[List[U]]
+    map(f,as,bs) // needs delayed mode
+    bs
+  }
 
   def flatMap[T,U](f: (Exp[T],Exp[List[U]]) => Rel, as: Exp[List[T]], cs: Exp[List[U]]): Rel =
     (as === nil) && (cs === nil) ||
@@ -339,7 +357,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
   def globalTrace_=(x:Exp[List[List[String]]]) = globalTrace0 = x
 
   // inject non-std interpretation by overriding || and &&
-
+/*
   override def infix_||(a: => Rel, b: => Rel): Rel = {
     val localTrace = globalTrace()
     def reset(x: => Rel) = { globalTrace = localTrace; x }
@@ -350,7 +368,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
     def reset(x: => Rel) = { globalTrace = localTrace; x }
     super.infix_&&(reset(a),b) // do not reset b
   }
-
+*/
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
     { (a,b) => 
       globalTrace = cons(term(s,List(a,b)),globalTrace()); 
@@ -358,7 +376,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
     }
 
   // inject non-std interpretation by transforming rules reified as Or and And
-
+/*
   var inrule: List[String] = Nil
   def rule0[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
     { (a,b) => 
@@ -385,7 +403,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
         inrule = local.tail
       }
     }
-
+*/
 }
 
 
@@ -575,20 +593,14 @@ class TestLists extends FunSuite with Base with Engine with NatBase with ListBas
   test("map") {
     expectResult(List("cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))")) {
       run[List[String]] { q =>
-        map[String,String]((q1,q2) => q1 === q2 , list("a","b","c","d","e","f"), q)
+        map[String,String]((u,v) => u === v, list("a","b","c","d","e","f"), q)
 
       }
     }
-    def elems = (List("a","b","c","d","e","f") map (term(_,Nil)),List("A","B","C","A","B","C") map (term(_,Nil))).zipped map (pair(_,_))
-    def f(xs:List[Exp[(String,String)]])(e1:Exp[String],e2:Exp[String]): Rel = xs match {
-      case Nil => No
-      case x::xs => 
-        //println(extractStr(x))
-        (pair(e1,e2) === x) || f(xs)(e1,e2)
-    }
     expectResult(List("cons(A,cons(B,cons(C,cons(A,cons(B,cons(C,nil))))))")) {
       run[List[String]] { q =>
-        map[String,String](f(elems), list("a","b","c","d","e","f"), q)
+        val elems = (List("a","b","c","d","e","f") zip List("A","B","C","A","B","C")): Exp[List[(String,String)]]
+        map[String,String]((u,v) => contains(elems,(u,v)), list("a","b","c","d","e","f"), q)
       }
     }
     expectResult(List(
@@ -602,11 +614,50 @@ class TestLists extends FunSuite with Base with Engine with NatBase with ListBas
       "cons(d,cons(e,cons(d,nil)))"
     )){
       run[List[String]] { q =>
-        map[String,String](f(elems), q, list("A","B","A"))
+        val elems = (List("a","b","c","d","e","f") zip List("A","B","C","A","B","C")): Exp[List[(String,String)]]
+        map[String,String]((u,v) => contains(elems,(u,v)), q, list("A","B","A"))
       }
     }
   }
 
+  test("mapf") {
+    try {
+      delayedMode = true
+
+      expectResult(List("cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))")) {
+        run[List[String]] { q =>
+          val res = mapf[String,String](list("a","b","c","d","e","f"), (u,v) => u === v)
+          q === res
+        }
+      }
+      expectResult(List("cons(A,cons(B,cons(C,cons(A,cons(B,cons(C,nil))))))")) {
+        run[List[String]] { q =>
+          val elems = (List("a","b","c","d","e","f") zip List("A","B","C","A","B","C")): Exp[List[(String,String)]]
+          val res = mapf[String,String](list("a","b","c","d","e","f"), (u,v) => contains(elems,(u,v)))
+          q === res
+        }
+      }
+      expectResult(List(
+        "cons(a,cons(b,cons(a,nil)))", 
+        "cons(a,cons(b,cons(d,nil)))", 
+        "cons(a,cons(e,cons(a,nil)))", 
+        "cons(a,cons(e,cons(d,nil)))", 
+        "cons(d,cons(b,cons(a,nil)))", 
+        "cons(d,cons(b,cons(d,nil)))", 
+        "cons(d,cons(e,cons(a,nil)))", 
+        "cons(d,cons(e,cons(d,nil)))"
+      )){
+        run[List[String]] { q =>
+          val elems = (List("a","b","c","d","e","f") zip List("A","B","C","A","B","C")): Exp[List[(String,String)]]
+          val res = mapf[String,String](q, (u,v) => contains(elems,(u,v)))
+          res === list("A","B","A")
+        }
+      }
+
+    } finally {
+      delayedMode = false        
+    }
+  }
 
   test("flatMap") {
     expectResult(List("cons(a,cons(a,cons(b,cons(b,cons(c,cons(c,nil))))))")) {
@@ -658,7 +709,7 @@ class TestTrees extends FunSuite with Base with Engine with NatBase with ListBas
     expectResult(List(
       "branch(branch(branch(nil,s(z),a,nil),s(s(z)),b,nil),s(s(s(z))),c,branch(nil,s(s(s(s(z)))),d,nil))"
     )) {
-      run[List[String]] { q =>
+      run[Tree[Int,String]] { q =>
         q === tree(1 -> "a", 2 -> "b", 3 -> "c", 4 -> "d")
       }
     }
@@ -770,7 +821,7 @@ trait TestGraphsBase extends FunSuite with Base with Engine with NatBase with Li
       "pair(b,cons(path(a,b),cons(path(c,b),cons(path(b,b),cons(path(a,b),nil)))))", 
       "pair(c,cons(path(b,c),cons(path(a,c),cons(path(c,c),cons(path(b,c),cons(path(a,c),nil))))))"
     )) {
-      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+      runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
         traceG.path("a",q1) && globalTrace() === q2
       }
     }
@@ -1111,7 +1162,7 @@ trait Tabling1 extends TablingBase {
 trait Tabling2 extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[DVar[_], Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
+  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
 
   val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
   val contTable = new scala.collection.mutable.HashMap[String, List[Cont]]
@@ -1161,7 +1212,7 @@ trait Tabling2 extends TablingBase {
       val k1x = extractStr(g1x)
       //assert(k1x == k1, s"expect $k1 but got $k1x") disabled for dvar init: default might not be written yet
       val k2 = extractStr(g2)
-      //println(s"$k2 --> $k1")
+      println(s"$k2 --> $k1")
 
       g1x === g2
     }
@@ -1172,8 +1223,8 @@ trait Tabling2 extends TablingBase {
       if (!enabled) return rec(() => a)(k)
 
       val dvarsRange = (0 until dvarCount).toList
-      def dvarsSet(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k.id)) }
-      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k.id) } 
+      def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
+      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) } 
 
       def invoke(cont: Cont, a: Answer) = {
         val (goal1, cstore1, cindex1, dvars1, ldvars0, ldvars1, k1) = cont
@@ -1335,7 +1386,7 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
       "pair(c,cons(path(b,c),cons(path(a,c),nil)))", 
       "pair(a,cons(path(c,a),cons(path(b,a),cons(path(a,a),nil))))"
     )) {
-      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+      runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
         tabling(true)
         pathRT("a",q1) && globalTrace() === q2
       }
@@ -1349,11 +1400,156 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
       "pair(c,cons(path(a,b),cons(path(a,c),nil)))",
       "pair(a,cons(path(a,b),cons(path(a,c),cons(path(a,a),nil))))"
     )) {
-      runN[(String,List[String])](5) { case Pair(q1,q2) =>
+      runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
         tabling(true)
         pathLT("a",q1) && globalTrace() === q2
       }
     }
     println("done")
   }
+
 }
+
+
+class TestTabling3 extends FunSuite with ListBase with NatBase with Tabling2 with Engine {
+
+  val accum = DVar(nil: Exp[List[String]])
+  def inc(n: Exp[Int]): Rel = {
+    (n === 0) || exists[Int] { n1 => 
+      (n === succ(n1)) && {
+        accum := cons("A", accum())
+        inc(n1)
+      }  
+    }
+  }
+
+  def dlet[T](p: (DVar[T],T))(body: =>Rel): Rel = new Custom("dlet") {
+    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+      val (v,x) = p
+      val old = v()
+      v := x
+      rec(() => body) { () => v := old; k() }
+    }
+  }
+
+  val last = DVar(nil: Exp[List[String]])
+  def inc2(n: Exp[Int]): Rel = {
+    (n === 0) && (accum() === last()) ||
+    exists[Int] { n1 => 
+      (n === succ(n1)) && exists[List[String]] { tail =>
+        accum() === cons("A", tail) && dlet(accum -> tail) {
+          inc2(n1)
+        }
+      }  
+    }
+  }
+
+
+  test("dletRel1") {
+    expectResult(List(
+      "pair(x0,cons(A,cons(A,cons(A,x0))))"
+    )) {
+      runN[(List[String],List[String])](5) { case Pair(q1,q2) =>
+        tabling(false)
+        dlet(last -> q1) { 
+          dlet(accum -> q2) {
+            inc2(3)
+          }
+        }
+      }
+    }
+  }
+
+
+  test("stateRel1") {
+    expectResult(List(
+      "pair(x0,cons(A,cons(A,cons(A,x0))))"
+    )) {
+      runN[(List[String],List[String])](5) { case Pair(q1,q2) =>
+        tabling(false)
+        accum := q1
+        inc(3) && accum() === q2
+      }
+    }
+  }
+
+  test("stateRel2") {
+    expectResult(List(
+      "pair(z,pair(x0,x0))", 
+      "pair(s(z),pair(x0,cons(A,x0)))", 
+      "pair(s(s(z)),pair(x0,cons(A,cons(A,x0))))", 
+      "pair(s(s(s(z))),pair(x0,cons(A,cons(A,cons(A,x0)))))", 
+      "pair(s(s(s(s(z)))),pair(x0,cons(A,cons(A,cons(A,cons(A,x0))))))"
+    )) {
+      runN[(Int,(List[String],List[String]))](5) { case Pair(q1,Pair(q2,q3)) =>
+        tabling(false)
+        accum := q2
+        inc(q1) && accum() === q3
+      }
+    }
+  }
+
+  test("stateRel3") {
+    expectResult(List(
+      "pair(z,cons(A,cons(A,cons(A,cons(A,nil)))))", 
+      "pair(s(z),cons(A,cons(A,cons(A,nil))))", 
+      "pair(s(s(z)),cons(A,cons(A,nil)))", 
+      "pair(s(s(s(z))),cons(A,nil))", 
+      "pair(s(s(s(s(z)))),nil)"
+    )) {
+      runN[(Int,List[String])](5) { case Pair(q1,q2) =>
+        tabling(false)
+        accum := q2
+        inc(q1) && accum() === List("A","A","A","A")
+      }
+    }
+  }
+
+
+  test("stateRel1T") {
+    expectResult(List(
+      "pair(x0,cons(A,cons(A,cons(A,x0))))"
+    )) {
+      runN[(List[String],List[String])](5) { case Pair(q1,q2) =>
+        tabling(true)
+        accum := q1
+        inc(3) && accum() === q2
+      }
+    }
+  }
+
+  test("stateRel2T") {
+    expectResult(List(
+      "pair(z,pair(x0,x0))", 
+      "pair(s(z),pair(x0,cons(A,x0)))", 
+      "pair(s(s(z)),pair(x0,cons(A,cons(A,x0))))", 
+      "pair(s(s(s(z))),pair(x0,cons(A,cons(A,cons(A,x0)))))", 
+      "pair(s(s(s(s(z)))),pair(x0,cons(A,cons(A,cons(A,cons(A,x0))))))"
+    )) {
+      runN[(Int,(List[String],List[String]))](5) { case Pair(q1,Pair(q2,q3)) =>
+        tabling(true)
+        accum := q2
+        inc(q1) && accum() === q3
+      }
+    }
+  }
+
+  test("stateRel3T") {
+    expectResult(List(
+      "pair(z,cons(A,cons(A,cons(A,cons(A,nil)))))", 
+      "pair(s(z),cons(A,cons(A,cons(A,nil))))", 
+      "pair(s(s(z)),cons(A,cons(A,nil)))", 
+      "pair(s(s(s(z))),cons(A,nil))", 
+      "pair(s(s(s(s(z)))),nil)"
+    )) {
+      runN[(Int,List[String])](5) { case Pair(q1,q2) =>
+        tabling(true)
+        accum := q2
+        inc(q1) && accum() === List("A","A","A","A")
+      }
+    }
+  }  
+}
+
+
+

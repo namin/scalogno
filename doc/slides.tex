@@ -82,14 +82,14 @@ def path(x: Exp[T], y: Exp[T]): Rel =
 
 // Queries
 run[(String,String)] { case Pair(x,y) => edge(x,y) }
-==> pair(a,b), pair(b,c), pair(c,a)
+//=> pair(a,b), pair(b,c), pair(c,a)
 
 runN[String](10) { q => path("a",q) }
-==> b, c, a, b, c, a, b, c, a, b
+//=> b, c, a, b, c, a, b, c, a, b
 \end{minted}
 \end{frame}
 
-\begin{frame}[fragile]{Deep Linguistic Reuse}
+\begin{frame}[fragile]{Deep Linguistic Reuse: OO Encapsulation}
 \begin{minted}{scala}
 trait Graph[T] {
   def edge(x: Exp[T], y: Exp[T]): Rel
@@ -103,6 +103,62 @@ val g = new Graph[String] {
     (x === "b") && (y === "c") ||
     (x === "c") && (y === "a")
 }
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Deep Linguistic Reuse: Type Classes}
+\begin{minted}{scala}
+trait Ord[T] { def lt(x:Exp[T],y:Exp[T]): Rel }
+
+implicit class OrdOps[T:Ord](x:Exp[T]) {
+  def <(y:Exp[T]): Rel =
+    implicitly[Ord[T]].lt(x,y)
+}
+
+implicit val ordNat = new Ord[Int] {
+  def lt(x:Exp[Int],y:Exp[Int]): Rel =
+    // ... elided
+}
+
+
+run[Int] { q => q < 4 } //=> 0,1,2,3
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Type Classes: Lexicographic Ordering on Polymorphic Lists}
+\begin{minted}{scala}
+implicit def ordList[T:Ord] = new Ord[List[T]] {
+  def lt(as:Exp[List[T]],bs:Exp[List[T]]): Rel = 
+    exists[T,List[T]] { (b,bs1) => 
+      (bs === cons(b,bs1)) && {
+      (as === nil) || exists[T,List[T]] { (a,as1) =>
+      (as === cons(a,as1)) && {
+      (a < b) || (a === b) && (as1 < bs1) }}}}
+
+run[List[Int]] { q => q < List(0,1,2) }
+//=> nil
+//   cons(z,nil)
+//   cons(z,cons(z,x0))
+//   cons(z,cons(s(z),nil)),
+//   cons(z,cons(s(z),cons(z,x0)))
+//   cons(z,cons(s(z),cons(s(z),x0)))
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Type Classes: Run Queries Forwards and Backwards}
+\begin{minted}{scala}
+run[String] { q =>
+  val t = tree(List(1,1,1) -> "a",
+               List(1,2,2) -> "b",
+               List(2,1,1) -> "c")
+  lookup(t,List(1,2,2),q)
+} //=> b
+run[Int] { q =>
+  val t = tree(List(1,1,1) -> "a",
+               cons(q,List(2,2)) -> "b",
+               List(2,2,2) -> "c")
+  lookup(t,List(1,2,2),"b")
+} //=> 1
 \end{minted}
 \end{frame}
 

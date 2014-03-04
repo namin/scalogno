@@ -235,7 +235,8 @@ runN[(String,List[String])](5) { case Pair(q1,q2) =>
 \begin{minted}{scala}
 val theprob = DVar(1.0)
 def flip(p: Double)(a: => Rel)(b: => Rel): Rel =
-  { theprob := theprob() * p; a } || { theprob := theprob() * (1.0 - p); b }
+  { theprob := theprob() * p; a } ||
+  { theprob := theprob() * (1.0 - p); b }
 
 runN[(Boolean,Double)](3) { case Pair(c,p) =>
   flip(0.2,c) && { p === theprob() } }
@@ -243,7 +244,7 @@ runN[(Boolean,Double)](3) { case Pair(c,p) =>
 \end{minted}
 \end{frame}
 
-\begin{frame}[fragile]{Clause Reification as Controlled Side Effect}
+\begin{frame}[fragile]{Clause Reification as Controlled Side Effect (Ex.)}
 \begin{minted}{scala}
 var allclauses = Map[String,Clause]()
 def reifyClause(goal: => Rel)(
@@ -263,6 +264,38 @@ run[List[Any]] { q =>
 //   cons(prove,cons(cons(path(b,x0),nil),nil)))), 
 // ... 2 more
 \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Clause Reification as Controlled Side Effect (Impl.)}
+\begin{minted}{scala}
+val moregoals = DVar(fresh[List[Goal]])
+def reifyGoals(goal: => Rel)(goals: Exp[List[Goal]]): Rel = {
+  moregoals := goals
+  goal && moregoals() === nil
+}
+def reflectGoal(goal: Exp[Goal]): Rel = {
+  val hole = moregoals()
+  moregoals := fresh
+  hole === cons(goal,moregoals())
+}
+// reifyGoals(reflectGoal("path(a,b)")
+//=>  "cons(path(a,b),nil)"
+
+def rule[A,B](s: String)(f:(Exp[A], Exp[B]) => Rel) = {
+  // ...
+}
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{The End}
+\begin{itemize}
+\item also implemented tabling (memoization semantics)
+\item take-away messages
+\begin{itemize}
+\item like in LMS, exploit deep linguistic reuse
+\item use virtualization instead of reflection for meta-programming
+\end{itemize}
+\end{itemize}
 \end{frame}
 
 \end{document}

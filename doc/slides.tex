@@ -199,4 +199,31 @@ solve_trace(Goal) :-
 \end{minted}
 \end{frame}
 
+\begin{frame}[fragile]{Tracing (Scala)}
+\begin{minted}{scala}
+val globalTrace = DVar(nil: Exp[List[List[String]]])
+def path(x: Exp[T], y: Exp[T]): Rel = {
+  globalTrace := cons(term("path",List(x,y)), globalTrace())
+  edge(x,y) || exists[T] { z => edge(x,z) && path(y,b) }
+}
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Modular Tracing (Scala)}
+\begin{minted}{scala}
+trait TracingGraph[T] extends Graph[T] {
+  override def path(x:Exp[T],y:Exp[T]) =
+    rule("path")(super.path)(x,y)
+}
+// tracing logic
+val globalTrace = DVar(nil: Exp[List[List[String]]])
+def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel):
+  (Exp[T],Exp[U]) => Rel =
+  { (a,b) =>
+    globalTrace := cons(term(s,List(a,b)), globalTrace())
+    f(a,b)
+  }
+\end{minted}
+\end{frame}
+
 \end{document}

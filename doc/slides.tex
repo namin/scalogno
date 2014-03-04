@@ -257,10 +257,10 @@ run[List[Any]] { q =>
     reifyClause(path(g)(fresh,fresh))(head,body)
   }
 }
-//=>
 // cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil)))),
 // ... 2 more
-// cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil)))), 
+// cons(to prove,cons(path(a,x0),
+//   cons(prove,cons(cons(path(b,x0),nil),nil)))), 
 // ... 2 more
 \end{minted}
 \end{frame}

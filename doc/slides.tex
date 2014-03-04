@@ -242,4 +242,27 @@ runN[(Boolean,Double)](3) { case Pair(c,p) =>
 //=> pair(true,0.2), pair(false,0.8)
 \end{minted}
 \end{frame}
+
+\begin{frame}[fragile]{Clause Reification as Controlled Side Effect}
+\begin{minted}{scala}
+var allclauses = Map[String,Clause]()
+def reifyClause(goal: => Rel)(
+    head: Exp[Goal], body: Exp[List[Goal]]): Rel =
+  reifyGoals(goal)(cons(head,nil)) &&
+  allclauses(extractKey(head))(head,body)
+run[List[Any]] { q =>
+  exists[Goal,List[Goal]] { (head,body) =>
+    q === cons("to prove", cons(head, 
+          cons("prove", cons(body, nil)))) &&
+    reifyClause(path(g)(fresh,fresh))(head,body)
+  }
+}
+//=>
+// cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil)))),
+// ... 2 more
+// cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil)))), 
+// ... 2 more
+\end{minted}
+\end{frame}
+
 \end{document}

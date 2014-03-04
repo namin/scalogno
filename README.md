@@ -2,6 +2,7 @@ scalogno
 ========
 
 Prototyping logic programming in Scala.
+Presentation with some highlights ([PDF](http://lampwww.epfl.ch/~amin/elf/scalogno-slides.pdf)).
 
 ScalaZ3 Setup
 -------------

@@ -223,6 +223,11 @@ def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel):
     globalTrace := cons(term(s,List(a,b)), globalTrace())
     f(a,b)
   }
+
+runN[(String,List[String])](5) { case Pair(q1,q2) =>
+      g.path("a",q1) && globalTrace() === q2 }
+//=> pair(b,cons(path(a,b),nil)),
+//   pair(c,cons(path(b,c),cons(path(a,c),nil))), ...
 \end{minted}
 \end{frame}
 

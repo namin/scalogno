@@ -76,7 +76,7 @@ def edge(x: Exp[String], y: Exp[String]): Rel =
   (x === "b") && (y === "c") ||
   (x === "c") && (y === "a")
 
-def path(x: Exp[T], y: Exp[T]): Rel =
+def path[T](x: Exp[T], y: Exp[T]): Rel =
   edge(x,y) ||
   exists[T] { z => edge(x,z) && path(y,b) }
 
@@ -287,13 +287,29 @@ def rule[A,B](s: String)(f:(Exp[A], Exp[B]) => Rel) = {
 \end{minted}
 \end{frame}
 
-\begin{frame}[fragile]{The End}
-\begin{itemize}
-\item also implemented tabling (memoization semantics)
-\item take-away messages
+\begin{frame}[fragile]{Tabling: Semantics of Memoization}
+Excerpt from Memoing for Logic Programs by David S. Warren:
+\tiny
+Intuitively, we think of a machine that is carrying out a nondeterministic procedure as duplicating itself at a point of choice, and as disappearing when it encounters failure. Thus at any time, we have a set of deterministic machines computing away. The set gets larger when any one has to make a nondeterministic choice, and it gets smaller when any one fails. To add memoing, we imagine a single global table containing every procedure call that has been made by any machine, and for each such call, the answers that have been returned for it. Since the situation is nondeterministic, there may be none, one, or many answers for any single call. Now each machine, before it makes a procedure call, looks in the global table to see if the call has already been made. If not, it adds the call to the table and continues computing. During its computation, whenever a machine returns from a procedure, it finds the associated call in the global table, adds the answer it has just computed, and continues computing. (If the answer is already in the table, then this answer is a duplicate, and the machine fails.) When a procedure is about to be called, if the call is found to be already in the table, then for each associated answer in the table, the machine must fork off a new copy of itself to continue the computation with that answer. It is possible that not all the answers are in the table at this time; some may still be in the process of being computed by other machines and will show up later. Thus when a machine encounters a call already in the table, it forks off copies of itself to continue with the answers that are there, and it remains suspended on that table entry. Then whenever a new answer gets added to the table, the suspended machine makes a duplicate of itself to continue computing with that new answer. When a machine finishes its computation successfully, it disappears. The entire computation is complete when (and if) no machines are computing.
+\end{frame}
+
+\begin{frame}[fragile]{Conclusion}
 \begin{itemize}
 \item like in LMS, exploit deep linguistic reuse
 \item use virtualization instead of reflection for meta-programming
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{The Future: Embedding Logical Frameworks in Scala}
+\begin{itemize}
+\item Possible improvements over Twelf
+\begin{itemize}
+\item custom search strategies
+\item meta-level abstraction: e.g. parametric lists
+\item do better than copy'n'paste modularity
+\item notion of functions: once you proved a relation is a function, use it as a function
+\item z3 for totality / coverage checking
+\item z3 as logic/constraint solving engine
 \end{itemize}
 \end{itemize}
 \end{frame}

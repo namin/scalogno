@@ -26,6 +26,84 @@
 
 \frame{\titlepage}
 
+\begin{frame}[fragile]{Logic Programming (Prolog)}
+\begin{columns}
+\begin{column}[t]{8cm}
+\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=2cm,
+  thick,main node/.style={circle,fill=blue!20,draw,font=\sffamily\Large\bfseries}]
 
+  \node[main node] (1) {a};
+  \node[main node] (2) [below right of=1] {b};
+  \node[main node] (3) [below left of=1] {c};
+
+  \path[every node/.style={font=\sffamily\small}]
+    (1) edge node [right] {} (2)
+    (2) edge node [right] {} (3)
+    (3) edge node [right] {} (1);
+
+\end{tikzpicture}
+\begin{minted}{prolog}
+edge(a,b).
+edge(b,c).
+edge(c,a).
+
+path(X, Y) :- edge(X, Y).
+path(X, Z) :- edge(X, Y), path(Y, Z).
+\end{minted}
+\end{column}
+\begin{column}[t]{4cm}
+\begin{minted}{prolog}
+?- edge(a, X).
+X = b.
+
+?- edge(X, a).
+X = c.
+
+?- path(a, X).
+X = b ;
+X = c ;
+X = a ;
+X = b .
+\end{minted}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Logic Programming (Scala)}
+\begin{minted}{scala}
+def edge(x: Exp[String], y: Exp[String]): Rel =
+  (x === "a") && (y === "b") ||
+  (x === "b") && (y === "c") ||
+  (x === "c") && (y === "a")
+
+def path(x: Exp[T], y: Exp[T]): Rel =
+  edge(x,y) ||
+  exists[T] { z => edge(x,z) && path(y,b) }
+
+// Queries
+run[(String,String)] { case Pair(x,y) => edge(x,y) }
+==> pair(a,b), pair(b,c), pair(c,a)
+
+runN[String](10) { q => path("a",q) }
+==> b, c, a, b, c, a, b, c, a, b
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Deep Linguistic Reuse}
+\begin{minted}{scala}
+trait Graph[T] {
+  def edge(x: Exp[T], y: Exp[T]): Rel
+  def path(x: Exp[T], y: Exp[T]): Rel =
+    edge(x,y) ||
+    exists[T] { z => edge(x,z) && path(y,b) }
+}
+val g = new Graph[String] {
+  def edge(x:Exp[String],y:Exp[String]) =
+    (x === "a") && (y === "b") ||
+    (x === "b") && (y === "c") ||
+    (x === "c") && (y === "a")
+}
+\end{minted}
+\end{frame}
 
 \end{document}

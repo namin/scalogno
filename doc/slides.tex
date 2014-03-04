@@ -231,4 +231,15 @@ runN[(String,List[String])](5) { case Pair(q1,q2) =>
 \end{minted}
 \end{frame}
 
+\begin{frame}[fragile]{Probabilistic Logic Computation}
+\begin{minted}{scala}
+val theprob = DVar(1.0)
+def flip(p: Double)(a: => Rel)(b: => Rel): Rel =
+  { theprob := theprob() * p; a } || { theprob := theprob() * (1.0 - p); b }
+
+runN[(Boolean,Double)](3) { case Pair(c,p) =>
+  flip(0.2,c) && { p === theprob() } }
+//=> pair(true,0.2), pair(false,0.8)
+\end{minted}
+\end{frame}
 \end{document}

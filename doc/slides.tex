@@ -168,7 +168,8 @@ run[Int] { q =>
   A meta-interpreter for pure Prolog (Art of Prolog, 17.5)
 
   solve(Goal) :-
-     Goal is true given the pure Prolog program defined by clause/2.
+     Goal is true given the pure Prolog program defined by
+     clause/2.
 */
 
      solve(true).
@@ -176,4 +177,26 @@ run[Int] { q =>
      solve(A) :- clause(A,B), solve(B).
 \end{minted}
 \end{frame}
+
+\begin{frame}[fragile]{Tracing Meta-Interpreter (Prolog)}
+\begin{minted}{prolog}
+/*  
+  A tracer for Prolog (Art of Prolog 17.7)
+*/
+		 
+solve_trace(Goal) :-
+	solve_trace(Goal,0).
+     solve_trace(true,Depth) :- !.
+     solve_trace((A,B),Depth) :-  !,
+        solve_trace(A,Depth), solve_trace(B,Depth). 
+     solve_trace(A,Depth) :-  
+	builtin(A), !, A, display(A,Depth), nl.
+     solve_trace(A,Depth) :-
+        clause(A,B), 
+	display(A,Depth), nl,
+	Depth1 is Depth + 1, 
+	solve_trace(B,Depth1).
+\end{minted}
+\end{frame}
+
 \end{document}

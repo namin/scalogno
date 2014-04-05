@@ -65,9 +65,11 @@ type KF = F => R
 def clos(f:F) = f
 def fclos(f:((F,KF))=>R): F = XXfix(f)
 
+val log = false
+
 abstract class Fun[T] extends (T=>Unit) with Product { 
 override def toString = productPrefix + '(' + productIterator.mkString(",") + ')'
-def apply(x:T) = { println("call "+this+" -- "+x); call(this,x) }}
+def apply(x:T) = { if (log) println("call "+this+" -- "+x); call(this,x) }}
 case class main0() extends Fun[(V,K)]
 case class ffix1(ymain:V,kmain:K) extends Fun[(F,KF)]
 case class flam2(ymain:V,kmain:K,yfix:F,kfix:KF) extends Fun[(V,K)]

@@ -1117,6 +1117,8 @@ trait TablingBase extends Base with Engine {
 
   def tabling(on: Boolean): Unit
 
+  def dprintln(x: Any) = () // println(x)
+
 }  
 
 
@@ -1138,7 +1140,7 @@ trait Tabling1 extends TablingBase {
       val key = extractStr(goal)
       table.get(key) match {
         case Some(goal1) if enabled => 
-          println(key + " seen: " + extractStr(goal1))
+          dprintln(key + " seen: " + extractStr(goal1))
           goal === goal1 // FIXME: not general enough!!!
           // TODO: invoke continuation with all stored answers
           // store continuation so that it can be called for future answers
@@ -1147,7 +1149,7 @@ trait Tabling1 extends TablingBase {
           println(key)
           table(key) = goal
           rec(() => a) { () => 
-            if (enabled) println("answer for "+key+": " + extractStr(goal)) 
+            if (enabled) dprintln("answer for "+key+": " + extractStr(goal)) 
             // TODO: memoize answer (if exists ignore?)
             // invoke all stored continuations with new answer
             k()
@@ -1212,7 +1214,7 @@ trait Tabling2 extends TablingBase {
       val k1x = extractStr(g1x)
       //assert(k1x == k1, s"expect $k1 but got $k1x") disabled for dvar init: default might not be written yet
       val k2 = extractStr(g2)
-      println(s"$k2 --> $k1")
+      dprintln(s"$k2 --> $k1")
 
       g1x === g2
     }
@@ -1254,11 +1256,11 @@ trait Tabling2 extends TablingBase {
       contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
         case Some(answers) => 
-          //println("found " + key)
+          //dprintln("found " + key)
           for ((ansKey, ansConstr) <- answers.toList) // mutable! convert to list
             invoke(cont,ansConstr)
         case _ => 
-          println(key)
+          dprintln(key)
           val ansMap = new scala.collection.mutable.HashMap[String, Answer]
           ansTable(key) = ansMap
           rec { () => 
@@ -1272,7 +1274,7 @@ trait Tabling2 extends TablingBase {
             val ansKey = extractStr(goal0) 
             ansMap.get(ansKey) match {
               case None => 
-                println("answer for "+key+": " + ansKey)
+                dprintln("answer for "+key+": " + ansKey)
                 val ansConstr = constrainAs(goal)
                 ansMap(ansKey) = ansConstr
                 var i = 0

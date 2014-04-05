@@ -7,7 +7,7 @@ trait Lf1 extends Base with Engine {
   def lf(s: Exp[LF], x: Exp[LF]): Exp[LF] = term("lf", List(s, x))
   def checktp(x: Exp[LF], y: Exp[LF]) = { x === lf(fresh,y); x }
 
-  def dprintln(s:Any) = println(s)
+  def dprintln(s:Any) = () // println(s)
 
   var instances: Map[String, List[(String,Term)]] = Map.empty withDefaultValue Nil
   def key(a: Atom) = { val s = a.toString; val i = s.indexOf("("); if (i < 0) s else s.substring(0,i) }

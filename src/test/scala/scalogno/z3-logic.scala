@@ -13,8 +13,12 @@ trait Z3LogicBase {
 
   class Typ[T]
   case class Exp[T](s: String) { override def toString = s }
-  case class Rel(s: String) { override def toString = s }
-  type Fun[A,B] = (Exp[A],Exp[B]) => Rel
+  //case class Rel(s: String) { override def toString = s }
+  type Fun2[A,B,C] = (Exp[A],Exp[B]) => Exp[C]
+  type Fun[A,B] = Fun2[A,B,Boolean]
+
+  type Rel = Exp[Boolean]
+  def Rel(s: String) = Exp[Boolean](s)
 
   implicit object boolTyp extends Typ[Boolean]  { override def toString = "Bool" }
   implicit object intTyp extends Typ[Int]  { override def toString = "Int" }
@@ -32,41 +36,44 @@ trait Z3LogicBase {
     zprintln(s"(declare-var x${nVars} ${implicitly[Typ[T]]})"); nVars += 1; Exp(s"x${nVars - 1}")
   }
 
-  def rel(s: String): Rel = {
+  def rel(s: String): Rel = reflect[Boolean](s)
+
+  def reflect[T:Typ](s: String): Exp[T] = {
     //val r = fresh[Boolean]
     //zprintln(s"(assert (= $r $s))")
-    zprintln(s"(define-const x${nVars} ${implicitly[Typ[Boolean]]} $s)"); 
-    nVars += 1; Rel(s"x${nVars - 1}")
+    zprintln(s"(define-const x${nVars} ${implicitly[Typ[T]]} $s)"); 
+    nVars += 1; Exp[T](s"x${nVars - 1}")
   }
+
 
   var seen = Set[String]()
   var allguards = Set[String]()
 
   var path = Rel("true")
 
-  def fun[A:Typ,B:Typ](name: String)(f: Fun[A,B]): Fun[A,B] = { (x,y) =>
+  def fun[A:Typ,B:Typ,C:Typ](name: String)(f: Fun2[A,B,C]): Fun2[A,B,C] = { (x,y) =>
     if (!seen(name)) {
-      zprintln(s"(declare-fun $name (${implicitly[Typ[A]]} ${implicitly[Typ[B]]}) Bool)")
+      zprintln(s"(declare-fun $name (${implicitly[Typ[A]]} ${implicitly[Typ[B]]}) ${implicitly[Typ[C]]})")
       seen += name
     }
     if (depth > 0) {
       depth -= 1
       zprintln(s";; IN  ($name $x $y)")
       val q = f(x,y)
-      val r = rel(s"($name $x $y)") // do we need the symbolic name??
+      val r = reflect[C](s"($name $x $y)") // do we need the symbolic name??
       zprintln(s";; OUT ($name $x $y)")
       zprintln(s"(assert (= $r $q))")
       depth += 1
       r
     } else {
       allguards += s"$path"
-      zprintln(s";; ABORT ($name $x $y) guard $path")
+      zprintln(s";; ABORT ($name $x $y) ") //guard $path")
       //rel(s"(=> $path ($name $x $y))")
-      rel(s"($name $x $y)")
+      reflect[C](s"($name $x $y)")
     }
   }
 
-  def lemma[A:Typ,B:Typ](name: String)(f: Fun[A,B]): Fun[A,B] = { (x,y) =>
+  def lemma[A:Typ,B:Typ](name: String)(f: Fun2[A,B,Boolean]): Fun2[A,B,Boolean] = { (x,y) =>
     // TODO: predicate on  precondition
 
     val f1 = fun(name)(f) 
@@ -86,6 +93,37 @@ trait Z3LogicBase {
     def ===(y: Exp[T]): Rel = Rel(s"(= $x $y)")
   }
 
+  def if_[T:Typ](c: Exp[Boolean])(a: => Exp[T])(b: => Exp[T]): Exp[T] = {
+      val save = path
+      //path = Exp(s"(and $save $c)")
+      path = Exp(s"$c")
+      val x1 = a
+      //path = Exp(s"(and $save (not $c))")
+      path = Exp(s"(not $c)")
+      val y1 = b
+      path = save
+      //val r = fresh[T]
+      reflect(s"(ite $c $x1 $y1)")
+      //zprintln(s"(assert (=> $c (= ($r $x1))))")
+      //zprintln(s"(assert (=> (not $c) (= ($r $y1))))")
+      //r
+  }
+
+  implicit def boolExp(x: Boolean) = Exp[Boolean](x.toString)
+
+  implicit class RelOps(x: Rel) {
+    def &&(y: => Rel): Rel = if_(x) { y } { false }
+    def ||(y: => Rel): Rel = if_(x) { true } { y }
+    def unary_! = {
+      val x1 = x
+      Rel(s"(not $x1)")
+    }
+    def ===>(y: => Rel): Rel = (!x) || y
+  }
+
+
+
+/*
   implicit class RelOps(x: => Rel) {
     def &&(y: => Rel): Rel = {
       val save = path
@@ -109,6 +147,7 @@ trait Z3LogicBase {
     }
     def ===>(y: => Rel): Rel = (!x) || y
   }
+*/
 
   implicit def intExp(x: Int) = Exp[Int](x.toString)    
 
@@ -367,13 +406,13 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
     t2 === top ||
     t1 === bot ||
     t1 === nat && t2 === nat ||
-    isArrow(t1) && isArrow(t1) && subtp(arg(t2),arg(t1)) && subtp(res(t1),res(t2))
+    isArrow(t1) && isArrow(t2) && subtp(arg(t2),arg(t1)) && subtp(res(t1),res(t2))
   }
 
   test("types1") {
 
     expectResult("((arrow bot top))") {
-      runD[Type](3) { t1 =>
+      runD[Type](4) { t1 =>
         subtp(arrow(nat,nat),t1)
       }
     }
@@ -397,7 +436,7 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
       isArrow(t1) && subtpRefl(arg(t1),XXX) && subtpRefl(res(t1),XXX)
     } && subtp(t1,t1)
 
-    def subtpRefl: Fun[Type,Type] = lemma[Type,Type]("subtp-refl")(subtpReflBody)
+    def subtpRefl: Fun[Type,Type] = lemma("subtp-refl")(subtpReflBody)
 
 
     expectResult("unsat") {

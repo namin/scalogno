@@ -24,7 +24,7 @@ libraryDependencies += "junit" % "junit" % "4.11" % "test"
 
 unmanagedJars in Compile += {
   val platform = ("uname" !!) stripLineEnd
-  val extlib = Map("Linux" -> "so", "Darwin" -> "dylib")(platform)
+  val extlib = Map("Linux" -> "so", "Darwin" -> "jnilib")(platform)
   file("../ScalaZ3/lib-bin/libscalaz3."+extlib)
 }
 

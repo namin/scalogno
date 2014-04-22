@@ -9,7 +9,7 @@ import scala.language.implicitConversions
 import java.io._
 
 
-trait Z3LogicBase {
+trait Z3LogicBase extends EmbeddedControls {
 
   class Typ[T]
   case class Exp[T](s: String) { override def toString = s }
@@ -93,8 +93,10 @@ trait Z3LogicBase {
     def ===(y: Exp[T]): Rel = Rel(s"(= $x $y)")
   }
 
-  def if_[T:Typ](c: Exp[Boolean])(a: => Exp[T])(b: => Exp[T]): Exp[T] = {
+  def __ifThenElse[T](c: Boolean, a: => T, b: => T): T = c match { case true => a case false => b }
+  def __ifThenElse[T:Typ](c: Exp[Boolean], a: => Exp[T], b: => Exp[T]): Exp[T] = {
       val save = path
+      // XXX TBD: use full path or only last cond??
       //path = Exp(s"(and $save $c)")
       path = Exp(s"$c")
       val x1 = a
@@ -102,8 +104,8 @@ trait Z3LogicBase {
       path = Exp(s"(not $c)")
       val y1 = b
       path = save
-      //val r = fresh[T]
       reflect(s"(ite $c $x1 $y1)")
+      //val r = fresh[T]
       //zprintln(s"(assert (=> $c (= ($r $x1))))")
       //zprintln(s"(assert (=> (not $c) (= ($r $y1))))")
       //r
@@ -112,8 +114,8 @@ trait Z3LogicBase {
   implicit def boolExp(x: Boolean) = Exp[Boolean](x.toString)
 
   implicit class RelOps(x: Rel) {
-    def &&(y: => Rel): Rel = if_(x) { y } { false }
-    def ||(y: => Rel): Rel = if_(x) { true } { y }
+    def &&(y: => Rel): Rel = if (x) { y } else { false }
+    def ||(y: => Rel): Rel = if(x) { true } else { y }
     def unary_! = {
       val x1 = x
       Rel(s"(not $x1)")
@@ -121,33 +123,6 @@ trait Z3LogicBase {
     def ===>(y: => Rel): Rel = (!x) || y
   }
 
-
-
-/*
-  implicit class RelOps(x: => Rel) {
-    def &&(y: => Rel): Rel = {
-      val save = path
-      val x1 = x
-      path = Rel(s"(and $path $x1)")
-      val y1 = y
-      path = save
-      rel(s"(and $x1 $y1)")
-    }
-    def ||(y: => Rel): Rel = {
-      val save = path
-      val x1 = x
-      path = save
-      val y1 = y
-      path = save
-      Rel(s"(or $x1 $y1)")
-    }
-    def unary_! = {
-      val x1 = x
-      Rel(s"(not $x1)")
-    }
-    def ===>(y: => Rel): Rel = (!x) || y
-  }
-*/
 
   implicit def intExp(x: Int) = Exp[Int](x.toString)    
 
@@ -448,5 +423,253 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
     }
 
   }
+
+}
+
+
+class TestZ3L_Eval extends FunSuite with Z3LogicBase {
+
+  /* ------- eval and quines ------- */
+
+/*
+  sealed abstract class Term
+  case class Var(x: Int) extends Term
+  case class Lambda(x: Int, y: Term) extends Term
+  case class App(x: Term, y: Term) extends Term
+  case object Quote extends Term
+
+  sealed abstract class Value
+  case class Closure(e:VEnv,x:Int,y:Term) extends Value
+  case class Code(x:Term) extends Value
+
+  sealed abstract class VOpt
+  case class Some(x:Value) extends VOpt
+  case object None extends VOpt
+
+  sealed abstract class VEnv
+  case object VNil extends VEnv
+  case class VCons(x: Int, y: Value, tl: VEnv) extends VEnv
+
+  TODO: get rid of boilerplate decls
+*/
+  trait Term
+  trait Value
+  trait VOpt
+  trait VEnv
+  implicit object termTyp extends Typ[Term] { override def toString = "Term" }
+  implicit object valueTyp extends Typ[Value] { override def toString = "Value" }
+  implicit object voptTyp extends Typ[VOpt] { override def toString = "VOpt" }
+  implicit object venvTyp extends Typ[VEnv] { override def toString = "VEnv" }
+
+  override def init() = {
+    zprintln("""
+(declare-datatypes () (
+  (Term 
+    (Var (vid Int))
+    (Lit (lvl Int))
+    (Lambda (param Int) (body Term))
+    (App (func Term) (arg Term))
+    Quote
+  )
+  (Value 
+    (Closure (clenv VEnv) (clparam Int) (clbody Term))
+    (Code (term Term))
+    (Const (cvl Int))
+  )
+  (VOpt
+    (VSome (get Value))
+    VNone
+  )
+  (VEnv
+    (VCons (name Int) (value Value) (tail VEnv))
+    VNil
+  )
+))
+""")
+  }
+
+  def Var(vid: Exp[Int]): Exp[Term] = Exp(s"(Var $vid)")
+  def Lit(lvl: Exp[Int]): Exp[Term] = Exp(s"(Lit $lvl)")
+  def Lambda(param: Exp[Int], body: Exp[Term]): Exp[Term] = Exp(s"(Lambda $param $body)")
+  def App(fun: Exp[Term], arg: Exp[Term]): Exp[Term] = Exp(s"(App $fun $arg)")
+  def Quote: Exp[Term] = Exp(s"Quote")
+
+  implicit class TermOps(x: Exp[Term]) {
+    def isVar:    Rel       = Rel(s"(is-Var $x)")
+    def isLit:    Rel       = Rel(s"(is-Lit $x)")
+    def isLambda: Rel       = Rel(s"(is-Lambda $x)")
+    def isApp:    Rel       = Rel(s"(is-App $x)")
+    def isQuote:  Rel       = Rel(s"(is-Quote $x)")
+    def vid:      Exp[Int]  = Exp(s"(vid $x)")
+    def lvl:      Exp[Int]  = Exp(s"(lvl $x)")
+    def param:    Exp[Int]  = Exp(s"(param $x)")
+    def body:     Exp[Term] = Exp(s"(body $x)")
+    def func:      Exp[Term] = Exp(s"(func $x)")
+    def arg:      Exp[Term] = Exp(s"(arg $x)")
+  }
+
+  def Closure(clenv: Exp[VEnv], clparam: Exp[Int], clbody: Exp[Term]): Exp[Value] = Exp(s"(Closure $clenv $clparam $clbody)")
+  def Code(term: Exp[Term]): Exp[Value] = Exp(s"(Code $term)")
+  def Const(cvl: Exp[Int]): Exp[Value] = Exp(s"(Const $cvl)")
+
+  implicit class ValueOps(x: Exp[Value]) {
+    def isClosure: Rel       = Rel(s"(is-Closure $x)")
+    def isCode:    Rel       = Rel(s"(is-Code $x)")
+    def clenv:     Exp[VEnv] = Exp(s"(clenv $x)")
+    def clparam:   Exp[Int]  = Exp(s"(clparam $x)")
+    def clbody:    Exp[Term] = Exp(s"(clbody $x)")
+    def term:      Exp[Term] = Exp(s"(term $x)")
+  }
+
+  def VSome(get: Exp[Value]): Exp[VOpt] = Exp(s"(VSome $get)")
+  def VNone: Exp[VOpt] = Exp(s"VNone")
+
+  implicit class VOptOps(x: Exp[VOpt]) {
+    def isVSome:    Rel       = Rel(s"(is-VSome $x)")
+    def isVNone:    Rel       = Rel(s"(is-VNone $x)")
+    def get:        Exp[Value]= Exp(s"(get $x)")
+  }
+
+  def VCons(name: Exp[Int], value: Exp[Value], tail: Exp[VEnv]): Exp[VEnv] = Exp(s"(VCons $name $value $tail)")
+  def VNil: Exp[VEnv] = Exp(s"VNil")
+
+  implicit class VEnvOps(x: Exp[VEnv]) {
+    def isVCons:    Rel       = Rel(s"(is-VCons $x)")
+    def isVNil:     Rel       = Rel(s"(is-VNil $x)")
+    def name:       Exp[Int]  = Exp(s"(name $x)")
+    def value:      Exp[Value]= Exp(s"(value $x)")
+    def tail:       Exp[VEnv] = Exp(s"(tail $x)")
+  }
+
+  /* ---- evaluator with simple quotation ---- */
+
+  /*
+  def vlookup(e: VEnv, x: Int): VOpt = {
+    e match {
+      case VCons(x1,v1,tail) => if (x == x1) Some(v1) else vlookup(tail,x)
+      case _ => None
+    }
+  }
+
+  def eval(n: Int, e: VEnv, x: Term): VOpt = if (n <= 0) None else {
+    x match {
+      case Lambda(x,y) => Some(Closure(e,x,y))
+      case App(Quote,y) => Some(Code(y))
+      case Var(x) => vlookup(e,x)
+
+      case App(x,y) => 
+        eval(n-1,e,x) match {
+          case Some(Closure(e1,x1,y1)) => 
+            eval(n-1,e,y) match {
+              case Some(v) => eval(n-1,VCons(x1,v,e1),y1)
+              case None => None
+            }
+          case Some(Code(c1)) =>
+            eval(n-1,e,y) match {
+              case Some(Code(c2)) => Some(Code(App(c1,c2)))
+              case _ => None
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+  }*/
+  
+  def vlookup: Fun2[VEnv,Int,VOpt] = fun("lookup") { (e: Exp[VEnv], x: Exp[Int]) =>
+    if (e.isVCons) {
+      if (x === e.name) { VSome(e.value) } else { vlookup(e.tail,x) }
+    } else {
+      VNone
+    }
+  }
+
+  def eval: Fun2[VEnv,Term,VOpt] = fun("eval") { (e: Exp[VEnv], x: Exp[Term]) =>
+    if (x.isLambda)   VSome(Closure(e,x.param,x.body)) else
+    if (x.isVar)      vlookup(e,x.vid) else
+    if (x.isApp) {
+      if (x.func.isQuote) VSome(Code(x.arg))
+      else {
+        val fun = eval(e,x.func)
+        val arg = eval(e,x.arg)
+        if (fun.isVSome && arg.isVSome && fun.get.isCode && arg.get.isCode) { 
+          VSome(Code(App(fun.get.term, arg.get.term))) 
+        } else if (fun.isVSome && arg.isVSome && fun.get.isClosure) { 
+          eval(VCons(fun.get.clparam,arg.get,fun.get.clenv),fun.get.clbody)
+        } else VNone
+      }
+    } else VNone
+  }
+
+
+  test("lookup") {
+    expectResult("((VSome (Const 1)))") {
+      run[VOpt] { x1 =>
+
+        val env = VCons(0,Const(0),VCons(1,Const(1),VCons(2,Const(2),VNil)))
+        vlookup(env,1) === x1
+      }
+    }    
+  }
+
+
+  /* ---- a simple quine ---- 
+  ((lambda (x)
+    (list x (list (quote quote) x)))
+   (quote
+    (lambda (x)
+     (list x (list (quote quote) x)))))
+  */
+
+  test("evalQuineForward") {
+    // forward evaluation (depth=5 is enough)
+    expectResult("((let ((a!1 (Lambda 0 (App (Var 0) (App (App Quote Quote) (Var 0)))))) (Code (App a!1 (App Quote a!1)))))") {
+      runD[Value](5) { y =>
+        val term = App(Lambda(0, App(Var(0), App(App(Quote,Quote), Var(0)))),
+                   App(Quote,Lambda(0, App(Var(0), App(App(Quote,Quote), Var(0))))))
+        eval(VNil,term) === VSome(y)
+      }
+    }    
+  }
+
+  test("evalQuineVerify") {
+    // verify quine
+    expectResult("unsat") {
+      runD[Value](5) { y =>
+        val term = App(Lambda(0, App(Var(0), App(App(Quote,Quote), Var(0)))),
+                   App(Quote,Lambda(0, App(Var(0), App(App(Quote,Quote), Var(0))))))
+        eval(VNil,term) !== VSome(Code(term))
+      }
+    }    
+  }
+
+  test("evalQuineGenPartial") {
+    // verify quine
+    expectResult("((Lambda 0 (App (Var 0) (App (App Quote Quote) (Var 0)))))") {
+      runD[Term](5) { y =>
+        val term = App(y,
+                   App(Quote,Lambda(0, App(Var(0), App(App(Quote,Quote), Var(0))))))
+        eval(VNil,term) === VSome(Code(term))
+      }
+    }    
+  }
+
+  /* this one takes ~25s to run */
+  test("evalQuineGenFull") {
+    // verify quine
+    expectResult("""((let ((a!1 (App (Lambda 4 (Lambda 4 (Var 4))) (App Quote (App Quote (Var 144))))) 
+      (a!2 (App Quote (Lambda 4 (Lambda 4 (Var 4))))) 
+      (a!3 (App Quote (App Quote (App Quote (Var 144))))) 
+      (a!4 (App (App (Lambda 72 (App Quote Quote)) (Lambda 73 (Var 110))) (Var 54)))) 
+      (let ((a!5 (Lambda 54 (App (App (App a!2 a!3) (Var 54)) a!4)))) 
+        (let ((a!6 (App a!1 (App (Lambda 42 a!5) (Lambda 45 (Var 257))))) 
+          (a!7 (App Quote (App (Lambda 42 a!5) (Lambda 45 (Var 257)))))) 
+            (App a!6 a!7)))))""".replaceAll("\n"," ").replaceAll(" +"," ")) {
+      runD[Term](5) { y =>
+        val term = y
+        eval(VNil,term) === VSome(Code(term))
+      }
+    }    
+  }
+
 
 }

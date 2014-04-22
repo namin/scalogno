@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaOrganization := "org.scala-lang.virtualized"
 
-scalaVersion := "2.10.2-RC1"
+scalaVersion := "2.10.2"
 
 scalacOptions += "-Yvirtualize"
 
@@ -16,7 +16,7 @@ scalacOptions += "-unchecked"
 
 scalacOptions += "-feature"
 
-libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % "2.10.2-RC1"
+libraryDependencies += "org.scala-lang.virtualized" % "scala-compiler" % "2.10.2"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.1" % "test"
 

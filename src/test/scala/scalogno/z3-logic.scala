@@ -528,6 +528,8 @@ class TestZ3L_Eval extends FunSuite with Z3LogicBase {
     def isVSome:    Rel       = Rel(s"(is-VSome $x)")
     def isVNone:    Rel       = Rel(s"(is-VNone $x)")
     def get:        Exp[Value]= Exp(s"(get $x)")
+
+    def foreach(f: Exp[Value] => Exp[VOpt]): Exp[VOpt] = if (x.isVSome) f(x.get) else VNone
   }
 
   def VCons(name: Exp[Int], value: Exp[Value], tail: Exp[VEnv]): Exp[VEnv] = Exp(s"(VCons $name $value $tail)")
@@ -589,13 +591,20 @@ class TestZ3L_Eval extends FunSuite with Z3LogicBase {
     if (x.isApp) {
       if (x.func.isQuote) VSome(Code(x.arg))
       else {
-        val fun = eval(e,x.func)
+        /*val fun = eval(e,x.func)
         val arg = eval(e,x.arg)
         if (fun.isVSome && arg.isVSome && fun.get.isCode && arg.get.isCode) { 
           VSome(Code(App(fun.get.term, arg.get.term))) 
         } else if (fun.isVSome && arg.isVSome && fun.get.isClosure) { 
           eval(VCons(fun.get.clparam,arg.get,fun.get.clenv),fun.get.clbody)
-        } else VNone
+        } else VNone*/
+        for (fun <- eval(e,x.func); arg <- eval(e,x.arg)) {
+          if (fun.isCode && arg.isCode)
+            VSome(Code(App(fun.term, arg.term)))
+          else if (fun.isClosure)
+            eval(VCons(fun.clparam,arg,fun.clenv),fun.clbody)
+          else VNone
+        }
       }
     } else VNone
   }

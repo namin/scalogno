@@ -97,11 +97,25 @@ trait Z3LogicBase extends EmbeddedControls {
   def __ifThenElse[T:Typ](c: Exp[Boolean], a: => Exp[T], b: => Exp[T]): Exp[T] = {
       val save = path
       // XXX TBD: use full path or only last cond??
-      //path = Exp(s"(and $save $c)")
-      path = Exp(s"$c")
+      /* 
+        the way we emit path conditions has a large effect on 
+        running time (full quine gen example):
+
+          path = Exp(s"(and $save $c)")         -->   5s
+          path = reflect(s"(and $save $c)")     -->  60s
+          path = Exp(s"$c")                     --> 200s
+
+        (i'm a bit surprised because i would have expected 
+        (2) to be the fastest due to better sharing)
+      */
+
+      //path = reflect(s"(and $save $c)")
+      path = Exp(s"(and $save $c)")
+      //path = Exp(s"$c")
       val x1 = a
-      //path = Exp(s"(and $save (not $c))")
-      path = Exp(s"(not $c)")
+      //path = reflect(s"(and $save (not $c))")
+      path = Exp(s"(and $save (not $c))")
+      //path = Exp(s"(not $c)")
       val y1 = b
       path = save
       reflect(s"(ite $c $x1 $y1)")
@@ -184,7 +198,7 @@ trait Z3LogicBase extends EmbeddedControls {
 
     import scala.sys.process._
     
-    val s = Process("z3 -rs:42 -smt2 out.smt").lines_!.toArray
+    val s = Process("time z3 -rs:0 -smt2 out.smt").lines_!.toArray  // XXX: strange, 0 is much better than 42? (for quine, 5s vs 75s)
     // s.foreach(println)
 
     val Array(s1,s2) = s.filter(_.contains("sat"))
@@ -612,7 +626,7 @@ class TestZ3L_Eval extends FunSuite with Z3LogicBase {
 
   test("lookup") {
     expectResult("((VSome (Const 1)))") {
-      run[VOpt] { x1 =>
+      runD[VOpt](5) { x1 =>
 
         val env = VCons(0,Const(0),VCons(1,Const(1),VCons(2,Const(2),VNil)))
         vlookup(env,1) === x1
@@ -631,11 +645,11 @@ class TestZ3L_Eval extends FunSuite with Z3LogicBase {
 
   test("evalQuineForward") {
     // forward evaluation (depth=5 is enough)
-    expectResult("((let ((a!1 (Lambda 0 (App (Var 0) (App (App Quote Quote) (Var 0)))))) (Code (App a!1 (App Quote a!1)))))") {
-      runD[Value](5) { y =>
+    expectResult("((let ((a!1 (Lambda 0 (App (Var 0) (App (App Quote Quote) (Var 0)))))) (App a!1 (App Quote a!1))))") {
+      runD[Term](5) { y =>
         val term = App(Lambda(0, App(Var(0), App(App(Quote,Quote), Var(0)))),
                    App(Quote,Lambda(0, App(Var(0), App(App(Quote,Quote), Var(0))))))
-        eval(VNil,term) === VSome(y)
+        eval(VNil,term) === VSome(Code(y))
       }
     }    
   }
@@ -651,8 +665,9 @@ class TestZ3L_Eval extends FunSuite with Z3LogicBase {
     }    
   }
 
+  /* now takes ~10s */
   test("evalQuineGenPartial") {
-    // verify quine
+    // partially generate quine
     expectResult("((Lambda 0 (App (Var 0) (App (App Quote Quote) (Var 0)))))") {
       runD[Term](5) { y =>
         val term = App(y,
@@ -662,9 +677,12 @@ class TestZ3L_Eval extends FunSuite with Z3LogicBase {
     }    
   }
 
-  /* this one takes ~25s to run */
+  /* takes ~5s with rand seed 0, >100s with other seeds, 
+  previously ~25s (commit ffb31e7ca007a0e4e3ead890d8749753fbdacb3e) */
   test("evalQuineGenFull") {
-    // verify quine
+    // fully generate quine
+/*
+    previous result (commit ffb31e7ca007a0e4e3ead890d8749753fbdacb3e)
     expectResult("""((let ((a!1 (App (Lambda 4 (Lambda 4 (Var 4))) (App Quote (App Quote (Var 144))))) 
       (a!2 (App Quote (Lambda 4 (Lambda 4 (Var 4))))) 
       (a!3 (App Quote (App Quote (App Quote (Var 144))))) 
@@ -673,6 +691,11 @@ class TestZ3L_Eval extends FunSuite with Z3LogicBase {
         (let ((a!6 (App a!1 (App (Lambda 42 a!5) (Lambda 45 (Var 257))))) 
           (a!7 (App Quote (App (Lambda 42 a!5) (Lambda 45 (Var 257)))))) 
             (App a!6 a!7)))))""".replaceAll("\n"," ").replaceAll(" +"," ")) {
+
+    now we're actually getting the simple one we'd expect
+*/
+
+    expectResult("((let ((a!1 (Lambda 81 (App (Var 81) (App (App Quote Quote) (Var 81)))))) (App a!1 (App Quote a!1))))") {
       runD[Term](5) { y =>
         val term = y
         eval(VNil,term) === VSome(Code(term))

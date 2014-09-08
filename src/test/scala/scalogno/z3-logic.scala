@@ -400,7 +400,7 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
 
   test("types1") {
 
-    expectResult("((arrow bot top))") {
+    expectResult("(top)") {
       runD[Type](4) { t1 =>
         subtp(arrow(nat,nat),t1)
       }

@@ -186,8 +186,9 @@ trait Z3LogicBase extends EmbeddedControls {
     out.println(s"(push)")
     out.println("(echo \"test without guards\")")
     out.println(s"(assert $r)")
-    out.println(s"(check-sat)")
-
+    out.println(s"(check-sat-using")
+    // XXX: strange, 0 is much better than 42? (for quine, 5s vs 75s)
+    out.println(s"(using-params smt :random-seed 0))")
 
     out.println(s"(get-model)")
     out.println(s"(pop)")
@@ -198,7 +199,7 @@ trait Z3LogicBase extends EmbeddedControls {
 
     import scala.sys.process._
     
-    val s = Process("time z3 -rs:0 -smt2 out.smt").lines_!.toArray  // XXX: strange, 0 is much better than 42? (for quine, 5s vs 75s)
+    val s = Process("time z3 -smt2 out.smt").lines_!.toArray
     // s.foreach(println)
 
     val Array(s1,s2) = s.filter(_.contains("sat"))

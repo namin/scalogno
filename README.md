@@ -9,18 +9,22 @@ Setup
 
 * On Mac OS X, ensure `gcc` is not an alias for `clang`
   * `gcc --version`
-    ```
-    gcc (Homebrew gcc49 4.9.1) 4.9.1
-    Copyright (C) 2014 Free Software Foundation, Inc.
-    This is free software; see the source for copying conditions.  There is NO
-    warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-    ```
+  
+```
+gcc (Homebrew gcc49 4.9.1) 4.9.1
+Copyright (C) 2014 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+```
+
   * continue with steps only if output looks like `clang`, e.g.
-    ```
-    Apple LLVM version 5.1 (clang-503.0.40) (based on LLVM 3.4svn)
-    Target: x86_64-apple-darwin13.3.0
-    Thread model: posix
-    ```
+
+```
+Apple LLVM version 5.1 (clang-503.0.40) (based on LLVM 3.4svn)
+Target: x86_64-apple-darwin13.3.0
+Thread model: posix
+```
+
   * `[brew](http://brew.sh/) install gcc49`
   * `sudo mv /usr/bin/gcc /usr/bin/gcc-mac`
   * `ln -s /usr/local/bin/gcc-4.9 /usr/local/bin/gcc`

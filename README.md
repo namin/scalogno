@@ -28,7 +28,7 @@ Thread model: posix
   * [`brew`](http://brew.sh/)` install gcc49`
   * `sudo mv /usr/bin/gcc /usr/bin/gcc-mac`
   * `ln -s /usr/local/bin/gcc-4.9 /usr/local/bin/gcc`
-  * `ln -s /usr/local/bin/gcc /usr/bin/gcc`
+  * `sudo ln -s /usr/local/bin/gcc /usr/bin/gcc`
 
 * Set up `z3` in sibling directory
   * `cd ..` (from this `scalogno` directory)

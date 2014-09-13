@@ -50,11 +50,11 @@ Thread model: posix
     * on Linux 64bit:
       * `mkdir -p z3/4.3-unix-64b/lib`
       * `cp ../z3/build/libz3.so z3/4.3-unix-64b/lib`
-      * `cp -r ../z3/src/api z3/4.3-unix-64-b/include`
+      * `cp -r ../z3/src/api z3/4.3-unix-64b/include`
     * on Mac OS X 64 bit:
       * `mkdir -p z3/4.3-osx-64b/lib`
       * `cp ../z3/build/libz3.dylib z3/4.3-osx-64b/lib`
-      * `cp -r ../z3/src/api z3/4.3-osx-64-b/include`
+      * `cp -r ../z3/src/api z3/4.3-osx-64b/include`
   * `sbt package`
   * `sbt packageBin` (might not be necessary, but doesn't hurt)
   * `sbt publish-local`

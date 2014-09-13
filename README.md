@@ -59,6 +59,7 @@ Thread model: posix
   * `sbt packageBin` (might not be necessary, but doesn't hurt)
   * `sbt publish-local`
   * `sbt test` (optional sanity check on Linux, but does not work for me on Mac OS X)
+  * `sbt package` (again on Mac OS X, to ensure `lib-bin/libscalaz3.dylib` is created)
   * `cd ../scalogno`
 
 * Run tests

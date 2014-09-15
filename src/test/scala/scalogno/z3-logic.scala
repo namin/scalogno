@@ -168,6 +168,9 @@ trait Z3LogicBase extends EmbeddedControls {
     val x = fresh[T]
     val r = f(x)
 
+    // XXX: strange, 0 is much better than 42? (for quine, 5s vs 75s)
+    out.println(s"(set-option :random-seed 0)")
+
     out.println("(echo \"" + s"query $x" + "\")")
 
     out.println(s"(push)")
@@ -186,9 +189,7 @@ trait Z3LogicBase extends EmbeddedControls {
     out.println(s"(push)")
     out.println("(echo \"test without guards\")")
     out.println(s"(assert $r)")
-    out.println(s"(check-sat-using")
-    // XXX: strange, 0 is much better than 42? (for quine, 5s vs 75s)
-    out.println(s"(using-params smt :random-seed 0))")
+    out.println(s"(check-sat)")
 
     out.println(s"(get-model)")
     out.println(s"(pop)")

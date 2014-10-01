@@ -128,6 +128,8 @@ trait Z3LogicBase extends EmbeddedControls {
   implicit def boolExp(x: Boolean) = Exp[Boolean](x.toString)
 
   implicit class RelOps(x: Rel) {
+    def &(y: Rel): Rel = Rel(s"(and $x $y)")
+    def |(y: Rel): Rel = Rel(s"(or $x $y)")
     def &&(y: => Rel): Rel = if (x) { y } else { false }
     def ||(y: => Rel): Rel = if(x) { true } else { y }
     def unary_! = {
@@ -705,5 +707,200 @@ class TestZ3L_Eval extends FunSuite with Z3LogicBase {
     }    
   }
 
+
+}
+
+
+
+class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
+
+  /* ------- typing ------- */
+
+  trait Term
+  trait Type
+  trait VOpt
+  trait VEnv
+  implicit object termTyp extends Typ[Term] { override def toString = "Term" }
+  implicit object typeTyp extends Typ[Type] { override def toString = "Type" }
+  implicit object voptTyp extends Typ[VOpt] { override def toString = "VOpt" }
+  implicit object venvTyp extends Typ[VEnv] { override def toString = "VEnv" }
+
+  override def init() = {
+    zprintln("""
+(declare-datatypes () (
+  (Term 
+    (Var (vid Int))
+    (Lit (lvl Int))
+    (Tup (fst Term) (snd Term))
+    (Fst (tupf Term))
+    (Snd (tups Term))
+    (Lambda (param Int) (paramtp Type) (body Term))
+    (App (func Term) (arg Term))
+  )
+  (Type 
+    (Arrow (arr1 Type) (arr2 Type))
+    (Tuple (tup1 Type) (tup2 Type))
+    INT
+  )
+  (VOpt
+    (VSome (get Type))
+    VNone
+  )
+  (VEnv
+    (VCons (name Int) (value Type) (tail VEnv))
+    VNil
+  )
+))
+""")
+  }
+
+  def Var(vid: Exp[Int]): Exp[Term] = Exp(s"(Var $vid)")
+  def Lit(lvl: Exp[Int]): Exp[Term] = Exp(s"(Lit $lvl)")
+  def Tup(fst: Exp[Int], snd: Exp[Term]): Exp[Term] = Exp(s"(Tup $fst $snd)")
+  def Fst(tup: Exp[Term]): Exp[Term] = Exp(s"(Fst $tup)")
+  def Snd(tup: Exp[Term]): Exp[Term] = Exp(s"(Snd $tup)")
+  def Lambda(param: Exp[Int], paramtp: Exp[Type], body: Exp[Term]): Exp[Term] = Exp(s"(Lambda $param $paramtp $body)")
+  def App(fun: Exp[Term], arg: Exp[Term]): Exp[Term] = Exp(s"(App $fun $arg)")
+
+  implicit class TermOps(x: Exp[Term]) {
+    def isVar:    Rel       = Rel(s"(is-Var $x)")
+    def isLit:    Rel       = Rel(s"(is-Lit $x)")
+    def isTup:    Rel       = Rel(s"(is-Tup $x)")
+    def isFst:    Rel       = Rel(s"(is-Fst $x)")
+    def isSnd:    Rel       = Rel(s"(is-Snd $x)")
+    def isLambda: Rel       = Rel(s"(is-Lambda $x)")
+    def isApp:    Rel       = Rel(s"(is-App $x)")
+    def isQuote:  Rel       = Rel(s"(is-Quote $x)")
+    def vid:      Exp[Int]  = Exp(s"(vid $x)")
+    def lvl:      Exp[Int]  = Exp(s"(lvl $x)")
+    def param:    Exp[Int]  = Exp(s"(param $x)")
+    def paramtp:  Exp[Type] = Exp(s"(paramtp $x)")
+    def body:     Exp[Term] = Exp(s"(body $x)")
+    def func:     Exp[Term] = Exp(s"(func $x)")
+    def arg:      Exp[Term] = Exp(s"(arg $x)")
+    def fst:      Exp[Term] = Exp(s"(fst $x)")
+    def snd:      Exp[Term] = Exp(s"(snd $x)")
+    def tupf:      Exp[Term] = Exp(s"(tupf $x)")
+    def tups:      Exp[Term] = Exp(s"(tups $x)")
+  }
+
+  def Arrow(arr1: Exp[Type], arr2: Exp[Type]): Exp[Type] = Exp(s"(Arrow $arr1 $arr2)")
+  def Tuple(tup1: Exp[Type], tup2: Exp[Type]): Exp[Type] = Exp(s"(Tuple $tup1 $tup2)")
+  def INT: Exp[Type] = Exp(s"INT")
+
+  implicit class TypeOps(x: Exp[Type]) {
+    def isArrow:   Rel       = Rel(s"(is-Arrow $x)")
+    def isTuple:   Rel       = Rel(s"(is-Tuple $x)")
+    def arr1:      Exp[Type] = Exp(s"(arr1 $x)")
+    def arr2:      Exp[Type] = Exp(s"(arr2 $x)")
+    def tup1:      Exp[Type] = Exp(s"(tup1 $x)")
+    def tup2:      Exp[Type] = Exp(s"(tup2 $x)")
+  }
+
+  def VSome(get: Exp[Type]): Exp[VOpt] = Exp(s"(VSome $get)")
+  def VNone: Exp[VOpt] = Exp(s"VNone")
+
+  implicit class VOptOps(x: Exp[VOpt]) {
+    def isVSome:    Rel       = Rel(s"(is-VSome $x)")
+    def isVNone:    Rel       = Rel(s"(is-VNone $x)")
+    def get:        Exp[Type] = Exp(s"(get $x)")
+
+    def foreach(f: Exp[Type] => Exp[VOpt]): Exp[VOpt] = if (x.isVSome) f(x.get) else VNone
+  }
+
+  def VCons(name: Exp[Int], value: Exp[Type], tail: Exp[VEnv]): Exp[VEnv] = Exp(s"(VCons $name $value $tail)")
+  def VNil: Exp[VEnv] = Exp(s"VNil")
+
+  implicit class VEnvOps(x: Exp[VEnv]) {
+    def isVCons:    Rel       = Rel(s"(is-VCons $x)")
+    def isVNil:     Rel       = Rel(s"(is-VNil $x)")
+    def name:       Exp[Int]  = Exp(s"(name $x)")
+    def value:      Exp[Type] = Exp(s"(value $x)")
+    def tail:       Exp[VEnv] = Exp(s"(tail $x)")
+  }
+
+  /* ---- simple type checker ---- */
+  
+  def vlookup: Fun2[VEnv,Int,VOpt] = fun("lookup") { (e: Exp[VEnv], x: Exp[Int]) =>
+    if (e.isVCons) {
+      if (x === e.name) { VSome(e.value) } else { vlookup(e.tail,x) }
+    } else {
+      VNone
+    }
+  }
+
+  def typecheck: Fun2[VEnv,Term,VOpt] = fun("typecheck") { (e: Exp[VEnv], x: Exp[Term]) =>
+    if (x.isVar)      vlookup(e,x.vid) else
+    if (x.isLambda)   for (body <- typecheck(VCons(x.param,x.paramtp,e),x.body)) VSome(Arrow(x.paramtp,body)) else
+//  enabling cases below causes tests to hang -- code size explosion ...
+/*    if (x.isApp) {
+      for (fun <- typecheck(e,x.func); arg <- typecheck(e,x.arg)) {
+        if (fun.isArrow && (fun.arr1 === arg))
+          VSome(fun.arr2)
+        else VNone
+      }} else*/
+    /*if (x.isTup) {
+      for (a <- typecheck(e,x.fst); b <- typecheck(e,x.fst)) VSome(Tuple(a,b))
+    } else*/
+    if (x.isFst) {
+      for (a <- typecheck(e,x.tupf)) if (a.isTuple) VSome(a.tup1) else VNone
+    } else
+    /*if (x.isSnd) {
+      for (a <- typecheck(e,x.tups)) if (a.isTuple) VSome(a.tup2) else VNone
+    } else*/ VNone
+  }
+
+
+  test("lookup") {
+    expectResult("((VSome INT))") {
+      runD[VOpt](5) { x1 =>
+
+        val env = VCons(0,INT,VCons(1,INT,VCons(2,INT,VNil)))
+        vlookup(env,1) === x1
+      }
+    }    
+  }
+
+
+  /* ---- simple type checking ---- */
+
+  test("typecheck1") {
+    expectResult("((VSome (Arrow INT (Arrow (Arrow INT INT) INT))))") {
+      runD[VOpt](5) { x1 =>
+
+        val term = Lambda(0, INT, Lambda(1, Arrow(INT,INT), Var(0)))
+        typecheck(VNil,term) === x1
+      }
+    }    
+  }
+
+  test("typeinv1") {
+    expectResult("((Lambda 2 INT (Var 2)))") {
+      runD[Term](5) { x1 =>
+
+        val tpe = Arrow(INT, INT)
+        typecheck(VNil,x1) === VSome(tpe)
+      }
+    }    
+  }
+
+  // inspiration: examples from http://lampwww.epfl.ch/~amin/drafts/ch.lhs
+
+  // to prove A /\ B => B /| A
+  // try to synthesize a term with type (A,B) -> (B,A)
+
+/*
+  ignore("typeinv3") {
+    expectResult("unsat") {
+      runD[Type](5) { a =>
+
+        val a,b = fresh[Type]
+        val tpe = Arrow(Tuple(a,b), Tuple(b,a))
+        val stm = typecheck(VNil,fresh[Term]) === VSome(tpe)
+        !stm
+      }
+    }    
+  }
+*/
 
 }

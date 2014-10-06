@@ -875,7 +875,7 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
   }
 
   test("typeinv1") {
-    expectResult("((Lambda 2 INT (Var 2)))") {
+    expectResult("((Lambda 0 INT (Var 0)))") {
       runD[Term](5) { x1 =>
 
         val tpe = Arrow(INT, INT)

@@ -5,6 +5,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 import scala.language.implicitConversions
+import scala.language.reflectiveCalls
 
 import java.io._
 
@@ -445,7 +446,6 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
 
 
   test("subtpRefl2") {
-    import scala.language.reflectiveCalls
 
     // a function A => C that we can (1) apply and (2) verify
     trait VFun[A,C] {

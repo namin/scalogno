@@ -25,6 +25,8 @@ trait Z3LogicBase extends EmbeddedControls {
   implicit object intTyp extends Typ[Int]  { override def toString = "Int" }
   implicit object intListTyp extends Typ[List[Int]]  { override def toString = "(List Int)" }
 
+  var mode = "default"
+
   var depth = 0
   var maxDepth = 0
 
@@ -110,14 +112,12 @@ trait Z3LogicBase extends EmbeddedControls {
         (i'm a bit surprised because i would have expected 
         (2) to be the fastest due to better sharing)
       */
+      def maybeFlatten(s: String): Rel = 
+        if (mode == "flattenPaths") Exp[Boolean](s) else reflect[Boolean](s)
 
-      //path = reflect(s"(and $save $c)")
-      path = Exp(s"(and $save $c)")
-      //path = Exp(s"$c")
+      path = maybeFlatten(s"(and $save $c)")
       val x1 = a
-      //path = reflect(s"(and $save (not $c))")
-      path = Exp(s"(and $save (not $c))")
-      //path = Exp(s"(not $c)")
+      path = maybeFlatten(s"(and $save (not $c))")
       val y1 = b
       path = save
       reflect(s"(ite $c $x1 $y1)")
@@ -478,44 +478,45 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
 
     var allvcs: Set[Exp[Boolean]] = Set()
 
+    def assert(c: Exp[Boolean]): Unit = {
+      val vc = reflect[Boolean](s"(=> $path $c)")
+      allvcs += vc
+      zprintln(s"(assert $vc)") // is this required?
+      path = Exp(s"(and $path $c)")
+    }
+
+    def assume(c: Exp[Boolean]): Unit = {
+      val vc = Exp[Boolean](s"(=> $path $c)")
+      path = Exp(s"(and $path $c)")
+    }
+
+
     def vfun[A:Typ,C:Typ](name: String)(f: Exp[A] => VBody[C]): VFun[A,C] = new VFun[A,C] {
       def apply(x: Exp[A]) = {
         val body = f(x)
+        val save = path
         val pre = body.precondition
-        allvcs += pre
-        // TODO -- check this:
-        // Right now 'allvcs' is global, and captures all preconditions
-        // of function calls. Do we need to introduce scope for this?
-        // What is the right thing to do for function calls that are
-        // inside pre or postconditions? Or inside if/else?
-        // --> Probably need to predicate everything on 'path'
-        //zprintln(s"(assert ( $pre))") // ensure precond
+        assert(pre)
         val r = fun[A,A,C](name)((x,y)=>f(x).apply) apply (x,fresh)
         val post = body.postcondition(r)
-        // It is important to predicate 'post' on 'pre':
-        // Otherwise test2b and test4 will erroneously verify.
-        val vc = Exp(s"(=> $pre $post)")
-        // Related to the above: what does this mean for assertions 
-        // inside body/post that may contribute to allvcs?
-        zprintln(s"(assert $vc)") // pre => post
+        assert(post)
         r
       }
 
       def verify(d: Int = 3) = expectResult("unsat")(run(d))
       def verifyFail(d: Int = 3) = assert("unsat" != run(d))
       def run(d: Int) = runD[A](d) { x =>
+        allvcs = Set()
         val body = f(x)
 
         val pre = body.precondition
+        assume(pre)
         val post = body.postcondition(body.apply)
-        allvcs += post
-        val vcs = allvcs.reduce(_ & _)
-
-        val vc = body.precondition ===> vcs // prove body
+        assert(post)
 
         //println(allvcs)
-        allvcs = Set()
-        !vc
+        val vcs = allvcs.reduce(_ & _)
+        !vcs
       }
     }
 
@@ -582,6 +583,8 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
 
 
 class TestZ3L_Eval extends FunSuite with Z3LogicBase {
+
+  mode = "flattenPaths" // see note above in __ifThenElse
 
   /* ------- eval and quines ------- */
 

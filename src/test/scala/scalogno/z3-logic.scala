@@ -65,6 +65,7 @@ trait Z3LogicBase extends EmbeddedControls {
       zprintln(s"(assert (= $r $q))")
       depth += 1
       r
+      //q
     } else {
       allguards += s"$path"
       zprintln(s";; ABORT ($name $x $y) ") //guard $path")
@@ -78,7 +79,7 @@ trait Z3LogicBase extends EmbeddedControls {
 
     val f1 = fun(name)(f) 
     val r = f1(x,y)
-    zprintln(s"(assert $r)")
+    zprintln(s"(assert $r)") // ensure postcond
     r
   }
 
@@ -440,6 +441,141 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
       }
     }
 
+  }
+
+
+  test("subtpRefl2") {
+    import scala.language.reflectiveCalls
+
+    // a function A => C that we can (1) apply and (2) verify
+    trait VFun[A,C] {
+      def apply(x: Exp[A]): Exp[C]
+
+      def verify(d: Int = 3): Unit
+      def verifyFail(d: Int = 3): Unit
+    }
+
+    // a function body with pre and postconditions
+    trait VBody[C] { self =>
+      def precondition: Exp[Boolean]
+      def apply: Exp[C]
+      def postcondition: Exp[C] => Exp[Boolean]
+    }
+
+    // syntactic sugar: require(pre) { body } ensuring(res => post)
+    def require[C](pre: => Exp[Boolean])(body: => Exp[C]) = new VBody[C] { self =>
+      def precondition = pre
+      def apply = body
+      def postcondition = res => true
+      def ensuring(f: Exp[C] => Exp[Boolean]) = new VBody[C] {
+        def precondition = self.precondition
+        def apply = self.apply
+        def postcondition = f
+      }
+      def holds(implicit ev: Exp[C] <:< Exp[Boolean]) = ensuring(res => res)
+    }
+
+
+    var allvcs: Set[Exp[Boolean]] = Set()
+
+    def vfun[A:Typ,C:Typ](name: String)(f: Exp[A] => VBody[C]): VFun[A,C] = new VFun[A,C] {
+      def apply(x: Exp[A]) = {
+        val body = f(x)
+        val pre = body.precondition
+        allvcs += pre
+        // TODO -- check this:
+        // Right now 'allvcs' is global, and captures all preconditions
+        // of function calls. Do we need to introduce scope for this?
+        // What is the right thing to do for function calls that are
+        // inside pre or postconditions? Or inside if/else?
+        // --> Probably need to predicate everything on 'path'
+        //zprintln(s"(assert ( $pre))") // ensure precond
+        val r = fun[A,A,C](name)((x,y)=>f(x).apply) apply (x,fresh)
+        val post = body.postcondition(r)
+        // It is important to predicate 'post' on 'pre':
+        // Otherwise test2b and test4 will erroneously verify.
+        val vc = Exp(s"(=> $pre $post)")
+        // Related to the above: what does this mean for assertions 
+        // inside body/post that may contribute to allvcs?
+        zprintln(s"(assert $vc)") // pre => post
+        r
+      }
+
+      def verify(d: Int = 3) = expectResult("unsat")(run(d))
+      def verifyFail(d: Int = 3) = assert("unsat" != run(d))
+      def run(d: Int) = runD[A](d) { x =>
+        val body = f(x)
+
+        val pre = body.precondition
+        val post = body.postcondition(body.apply)
+        allvcs += post
+        val vcs = allvcs.reduce(_ & _)
+
+        val vc = body.precondition ===> vcs // prove body
+
+        //println(allvcs)
+        allvcs = Set()
+        !vc
+      }
+    }
+
+
+
+    def subtpRefl2: VFun[Type,Boolean] = vfun("subtp-refl") { t1 => 
+      require(true) {
+      {
+        !isArrow(t1) ||
+        isArrow(t1) && subtpRefl2(arg(t1)) && subtpRefl2(res(t1))
+      } && subtp(t1,t1)
+      } ensuring(res => res)
+    }
+
+    subtpRefl2.verify()
+
+
+    def test1: VFun[Int,Int] = vfun("test1") { x => 
+      require(x > 0) { // > 0 ok, >= 0 fails
+        x - 1
+      } ensuring { _ >= 0 }
+    }
+
+    test1.verify()
+
+    def test2: VFun[Int,Int] = vfun("test2") { x => 
+      require(x > 0) { // > 0 ok, >= 0 fails
+        test1(x)
+      } ensuring { _ >= 0 }
+    }
+
+    test2.verify()
+
+    def test2b: VFun[Int,Int] = vfun("test2b") { x => 
+      require(x >= 0) { // > 0 ok, >= 0 fails
+        test1(x)
+      } ensuring { _ >= 0 }
+    }
+
+    test2b.verifyFail()
+
+    // ---
+
+    def test3: VFun[Int,Int] = vfun("test3") { x => 
+      require(false) {
+        666
+      } ensuring { _ => 0 > 1 }
+    }
+
+    test3.verify() // from false we can prove anything
+
+    def test4: VFun[Int,Int] = vfun("test4") { x => 
+      require(true) {
+        test3(x)
+      } ensuring { _ => true }
+    }
+
+    test4.verifyFail(0) // but we can't use false ...
+    test4.verifyFail(1)
+    test4.verifyFail(3)
   }
 
 }

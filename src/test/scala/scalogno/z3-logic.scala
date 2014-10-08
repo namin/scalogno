@@ -170,7 +170,7 @@ trait Z3LogicBase extends EmbeddedControls {
   }
 
   def assume(c: Exp[Boolean]): Unit = {
-    val vc = Exp[Boolean](s"(=> $path $c)")
+    //val vc = Exp[Boolean](s"(=> $path $c)")
     path = Exp(s"(and $path $c)")
   }
 
@@ -493,9 +493,9 @@ class TestZ3L_Verif extends FunSuite with Z3LogicBase {
     }
 
     test2b.verifyFail()
+  }
 
-    // ---
-
+  test("verif2") {
     def test3: VFun[Int,Int] = vfun("test3") { x => 
       require(false) {
         666

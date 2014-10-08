@@ -177,6 +177,7 @@ trait Z3LogicBase extends EmbeddedControls {
 
     out.println("(echo \"" + s"query $x" + "\")")
 
+
     out.println(s"(push)")
     out.println("(echo \"test with guards -- functions unreachable\")")
     for (g <- allguards)
@@ -197,6 +198,7 @@ trait Z3LogicBase extends EmbeddedControls {
 
     out.println(s"(get-model)")
     out.println(s"(pop)")
+
 
     out.println("(echo \"done\")")
 
@@ -879,7 +881,7 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
   (Type 
     (Arrow (arr1 Type) (arr2 Type))
     (Tuple (tup1 Type) (tup2 Type))
-    INT
+    T1 T2 T3 T4
   )
   (VOpt
     (VSome (get Type))
@@ -925,7 +927,10 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
 
   def Arrow(arr1: Exp[Type], arr2: Exp[Type]): Exp[Type] = Exp(s"(Arrow $arr1 $arr2)")
   def Tuple(tup1: Exp[Type], tup2: Exp[Type]): Exp[Type] = Exp(s"(Tuple $tup1 $tup2)")
-  def INT: Exp[Type] = Exp(s"INT")
+  def T1: Exp[Type] = Exp(s"T1")
+  def T2: Exp[Type] = Exp(s"T2")
+  def T3: Exp[Type] = Exp(s"T3")
+  def T4: Exp[Type] = Exp(s"T4")
 
   implicit class TypeOps(x: Exp[Type]) {
     def isArrow:   Rel       = Rel(s"(is-Arrow $x)")
@@ -971,29 +976,29 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
   def typecheck: Fun2[VEnv,Term,VOpt] = fun("typecheck") { (e: Exp[VEnv], x: Exp[Term]) =>
     if (x.isVar)      vlookup(e,x.vid) else
     if (x.isLambda)   for (body <- typecheck(VCons(x.param,x.paramtp,e),x.body)) VSome(Arrow(x.paramtp,body)) else
-//  enabling cases below causes tests to hang -- code size explosion ...
+    // enabling app and tup cases below causes tests to hang:
+    // code size explosion due to two recursive calls each ...
 /*    if (x.isApp) {
       for (fun <- typecheck(e,x.func); arg <- typecheck(e,x.arg)) {
         if (fun.isArrow && (fun.arr1 === arg))
           VSome(fun.arr2)
         else VNone
-      }} else*/
-    /*if (x.isTup) {
+      }} else
+    if (x.isTup) {
       for (a <- typecheck(e,x.fst); b <- typecheck(e,x.fst)) VSome(Tuple(a,b))
     } else*/
     if (x.isFst) {
       for (a <- typecheck(e,x.tupf)) if (a.isTuple) VSome(a.tup1) else VNone
     } else
-    /*if (x.isSnd) {
+    if (x.isSnd) {
       for (a <- typecheck(e,x.tups)) if (a.isTuple) VSome(a.tup2) else VNone
-    } else*/ VNone
+    } else VNone
   }
 
-
   test("lookup") {
-    expectResult("((VSome INT))") {
+    expectResult("((VSome T1))") {
       runD[VOpt](5) { x1 =>
-
+        val INT = T1
         val env = VCons(0,INT,VCons(1,INT,VCons(2,INT,VNil)))
         vlookup(env,1) === x1
       }
@@ -1004,9 +1009,9 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
   /* ---- simple type checking ---- */
 
   test("typecheck1") {
-    expectResult("((VSome (Arrow INT (Arrow (Arrow INT INT) INT))))") {
+    expectResult("((VSome (Arrow T1 (Arrow (Arrow T1 T1) T1))))") {
       runD[VOpt](5) { x1 =>
-
+        val INT = T1
         val term = Lambda(0, INT, Lambda(1, Arrow(INT,INT), Var(0)))
         typecheck(VNil,term) === x1
       }
@@ -1014,9 +1019,9 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
   }
 
   test("typeinv1") {
-    expectResult("((Lambda 0 INT (Var 0)))") {
-      runD[Term](5) { x1 =>
-
+    expectResult("((Lambda 3 T1 (Var 3)))") {
+      runD[Term](3) { x1 =>
+        val INT = T1
         val tpe = Arrow(INT, INT)
         typecheck(VNil,x1) === VSome(tpe)
       }
@@ -1028,8 +1033,29 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
   // to prove A /\ B => B /| A
   // try to synthesize a term with type (A,B) -> (B,A)
 
+  test("typeinv2") {
+    expectResult("((Fst (Var 0)))") {
+      // given A & B, find A
+      runD[Term](3) { x1 =>
+        typecheck(VCons(0,Tuple(T1,T2),VNil),x1) === VSome(T1)
+      }
+    }    
+  }
+
+  test("typeinv3") {
+    expectResult("((Lambda 5 (Tuple T1 T2) (Fst (Var 5))))") {
+      // A & B => A
+      runD[Term](4) { x1 =>
+        val tpe = Arrow(Tuple(T1,T2), T1)
+        typecheck(VNil,x1) === VSome(tpe)
+      }
+    }    
+  }
+
+
 /*
-  ignore("typeinv3") {
+  // can't build tuples, due to code size ...
+  ignore("typeinv4") {
     expectResult("unsat") {
       runD[Type](5) { a =>
 

@@ -14,16 +14,10 @@ trait Z3LogicBase extends EmbeddedControls {
 
   class Typ[T]
   case class Exp[T](s: String) { override def toString = s }
-  //case class Rel(s: String) { override def toString = s }
   type Fun2[A,B,C] = (Exp[A],Exp[B]) => Exp[C]
   type Fun[A,B] = Fun2[A,B,Boolean]
 
-  type Rel = Exp[Boolean]
-  def Rel(s: String) = Exp[Boolean](s)
-
-  implicit object boolTyp extends Typ[Boolean]  { override def toString = "Bool" }
-  implicit object intTyp extends Typ[Int]  { override def toString = "Int" }
-  implicit object intListTyp extends Typ[List[Int]]  { override def toString = "(List Int)" }
+  /* plumbing: config options, fresh name generation, emitting bindings, etc */
 
   var mode = "default"
 
@@ -39,8 +33,6 @@ trait Z3LogicBase extends EmbeddedControls {
     zprintln(s"(declare-var x${nVars} ${implicitly[Typ[T]]})"); nVars += 1; Exp(s"x${nVars - 1}")
   }
 
-  def rel(s: String): Rel = reflect[Boolean](s)
-
   def reflect[T:Typ](s: String): Exp[T] = {
     //val r = fresh[Boolean]
     //zprintln(s"(assert (= $r $s))")
@@ -48,11 +40,90 @@ trait Z3LogicBase extends EmbeddedControls {
     nVars += 1; Exp[T](s"x${nVars - 1}")
   }
 
+  /* base types: Boolean, Int, List */
+
+  implicit object boolTyp extends Typ[Boolean]  { override def toString = "Bool" }
+  implicit object intTyp extends Typ[Int]  { override def toString = "Int" }
+  implicit object intListTyp extends Typ[List[Int]]  { override def toString = "(List Int)" }
+
+  type Rel = Exp[Boolean]
+  def Rel(s: String) = Exp[Boolean](s)
+  def rel(s: String): Rel = reflect[Boolean](s)
+
+
+  def exists[T:Typ](f: Exp[T] => Rel): Rel = f(fresh)
+  def cons[T](h: Exp[T], t: Exp[List[T]]): Exp[List[T]] = Exp(s"(insert $h $t)")
+  def succ(t: Exp[Int]): Exp[Int] = Exp(s"(+ 1 $t)")
+  def nil[T]: Exp[List[T]] = Exp(s"nil")
+  def zero: Exp[Int] = Exp(s"0")
+  
+  implicit class TermOps[T](x: Exp[T]) {
+    def !==(y: Exp[T]): Rel = Rel(s"(not (= $x $y))")
+    def ===(y: Exp[T]): Rel = Rel(s"(= $x $y)")
+  }
+
+  implicit def boolExp(x: Boolean) = Exp[Boolean](x.toString)
+
+  implicit class RelOps(x: Rel) {
+    def &(y: Rel): Rel = Rel(s"(and $x $y)")
+    def |(y: Rel): Rel = Rel(s"(or $x $y)")
+    def &&(y: => Rel): Rel = if (x) { y } else { false }
+    def ||(y: => Rel): Rel = if(x) { true } else { y }
+    def unary_! = {
+      val x1 = x
+      Rel(s"(not $x1)")
+    }
+    def ===>(y: => Rel): Rel = (!x) || y
+  }
+
+
+  implicit def intExp(x: Int) = Exp[Int](x.toString)    
+
+  implicit class IntOps(x: Exp[Int]) {
+    def >(y: Exp[Int]) = Rel(s"(> $x $y)")
+    def >=(y: Exp[Int]) = Rel(s"(>= $x $y)")
+    def +(y: Exp[Int]) = Exp[Int](s"(+ $x $y)")
+    def -(y: Exp[Int]) = Exp[Int](s"(- $x $y)")
+  }
+
+  /* control flow: conditionals */
+
+  var path = Rel("true")
+
+  def __ifThenElse[T](c: Boolean, a: => T, b: => T): T = c match { case true => a case false => b }
+  def __ifThenElse[T:Typ](c: Exp[Boolean], a: => Exp[T], b: => Exp[T]): Exp[T] = {
+      val save = path
+      // XXX TBD: use full path or only last cond??
+      /* 
+        the way we emit path conditions has a large effect on 
+        running time (full quine gen example):
+
+          path = Exp(s"(and $save $c)")         -->   5s
+          path = reflect(s"(and $save $c)")     -->  60s
+          path = Exp(s"$c")                     --> 200s
+
+        (i'm a bit surprised because i would have expected 
+        (2) to be the fastest due to better sharing)
+      */
+      def maybeFlatten(s: String): Rel = 
+        if (mode == "flattenPaths") Exp[Boolean](s) else reflect[Boolean](s)
+
+      path = maybeFlatten(s"(and $save $c)")
+      val x1 = a
+      path = maybeFlatten(s"(and $save (not $c))")
+      val y1 = b
+      path = save
+      reflect(s"(ite $c $x1 $y1)")
+      //val r = fresh[T]
+      //zprintln(s"(assert (=> $c (= ($r $x1))))")
+      //zprintln(s"(assert (=> (not $c) (= ($r $y1))))")
+      //r
+  }
+
+  /* functions */
 
   var seen = Set[String]()
   var allguards = Set[String]()
-
-  var path = Rel("true")
 
   def fun[A:Typ,B:Typ,C:Typ](name: String)(f: Fun2[A,B,C]): Fun2[A,B,C] = { (x,y) =>
     if (!seen(name)) {
@@ -86,72 +157,84 @@ trait Z3LogicBase extends EmbeddedControls {
     r
   }
 
-  def exists[T:Typ](f: Exp[T] => Rel): Rel = f(fresh)
-  def cons[T](h: Exp[T], t: Exp[List[T]]): Exp[List[T]] = Exp(s"(insert $h $t)")
-  def succ(t: Exp[Int]): Exp[Int] = Exp(s"(+ 1 $t)")
-  def nil[T]: Exp[List[T]] = Exp(s"nil")
-  def zero: Exp[Int] = Exp(s"0")
-  
-  implicit class TermOps[T](x: Exp[T]) {
-    def !==(y: Exp[T]): Rel = Rel(s"(not (= $x $y))")
-    def ===(y: Exp[T]): Rel = Rel(s"(= $x $y)")
+
+  /* verification primitives */
+
+  var allvcs: Set[Exp[Boolean]] = Set()
+
+  def assert(c: Exp[Boolean]): Unit = {
+    val vc = reflect[Boolean](s"(=> $path $c)")
+    allvcs += vc
+    zprintln(s"(assert $vc)") // is this required?
+    path = Exp(s"(and $path $c)")
   }
 
-  def __ifThenElse[T](c: Boolean, a: => T, b: => T): T = c match { case true => a case false => b }
-  def __ifThenElse[T:Typ](c: Exp[Boolean], a: => Exp[T], b: => Exp[T]): Exp[T] = {
-      val save = path
-      // XXX TBD: use full path or only last cond??
-      /* 
-        the way we emit path conditions has a large effect on 
-        running time (full quine gen example):
-
-          path = Exp(s"(and $save $c)")         -->   5s
-          path = reflect(s"(and $save $c)")     -->  60s
-          path = Exp(s"$c")                     --> 200s
-
-        (i'm a bit surprised because i would have expected 
-        (2) to be the fastest due to better sharing)
-      */
-      def maybeFlatten(s: String): Rel = 
-        if (mode == "flattenPaths") Exp[Boolean](s) else reflect[Boolean](s)
-
-      path = maybeFlatten(s"(and $save $c)")
-      val x1 = a
-      path = maybeFlatten(s"(and $save (not $c))")
-      val y1 = b
-      path = save
-      reflect(s"(ite $c $x1 $y1)")
-      //val r = fresh[T]
-      //zprintln(s"(assert (=> $c (= ($r $x1))))")
-      //zprintln(s"(assert (=> (not $c) (= ($r $y1))))")
-      //r
+  def assume(c: Exp[Boolean]): Unit = {
+    val vc = Exp[Boolean](s"(=> $path $c)")
+    path = Exp(s"(and $path $c)")
   }
 
-  implicit def boolExp(x: Boolean) = Exp[Boolean](x.toString)
 
-  implicit class RelOps(x: Rel) {
-    def &(y: Rel): Rel = Rel(s"(and $x $y)")
-    def |(y: Rel): Rel = Rel(s"(or $x $y)")
-    def &&(y: => Rel): Rel = if (x) { y } else { false }
-    def ||(y: => Rel): Rel = if(x) { true } else { y }
-    def unary_! = {
-      val x1 = x
-      Rel(s"(not $x1)")
+  /* verifiable functions with pre and post conditions */
+
+  // a function A => C that we can (1) apply and (2) verify
+  trait VFun[A,C] {
+    def apply(x: Exp[A]): Exp[C]
+
+    def verify(d: Int = 3): Unit
+    def verifyFail(d: Int = 3): Unit
+  }
+
+  // a function body with pre and postconditions
+  trait VBody[C] { self =>
+    def precondition: Exp[Boolean]
+    def apply: Exp[C]
+    def postcondition: Exp[C] => Exp[Boolean]
+  }
+
+  // syntactic sugar: require(pre) { body } ensuring(res => post)
+  def require[C](pre: => Exp[Boolean])(body: => Exp[C]) = new VBody[C] { self =>
+    def precondition = pre
+    def apply = body
+    def postcondition = res => true
+    def ensuring(f: Exp[C] => Exp[Boolean]) = new VBody[C] {
+      def precondition = self.precondition
+      def apply = self.apply
+      def postcondition = f
     }
-    def ===>(y: => Rel): Rel = (!x) || y
+    def holds(implicit ev: Exp[C] <:< Exp[Boolean]) = ensuring(res => res)
   }
 
 
-  implicit def intExp(x: Int) = Exp[Int](x.toString)    
+  def vfun[A:Typ,C:Typ](name: String)(f: Exp[A] => VBody[C]): VFun[A,C] = new VFun[A,C] {
+    def apply(x: Exp[A]) = {
+      val body = f(x)
+      val save = path
+      val pre = body.precondition
+      assert(pre)
+      val r = fun[A,A,C](name)((x,y)=>f(x).apply) apply (x,fresh)
+      val post = body.postcondition(r)
+      assert(post)
+      r
+    }
 
-  implicit class IntOps(x: Exp[Int]) {
-    def >(y: Exp[Int]) = Rel(s"(> $x $y)")
-    def >=(y: Exp[Int]) = Rel(s"(>= $x $y)")
-    def +(y: Exp[Int]) = Exp[Int](s"(+ $x $y)")
-    def -(y: Exp[Int]) = Exp[Int](s"(- $x $y)")
+    def verify(d: Int = 3) = assert("unsat" == run(d))
+    def verifyFail(d: Int = 3) = assert("unsat" != run(d))
+    def run(d: Int) = runD[A](d) { x =>
+      allvcs = Set()
+      val body = f(x)
+
+      val pre = body.precondition
+      assume(pre)
+      val post = body.postcondition(body.apply)
+      assert(post)
+      true
+    }
   }
+
+
+  /* top-level run handler */
   
-
   def run[T:Typ](f: Exp[T] => Rel): String = {
     Stream.from(2).map(runD(_)(f)).dropWhile(_ == "maybe").head
   }
@@ -162,8 +245,9 @@ trait Z3LogicBase extends EmbeddedControls {
     nVars = 0
     maxDepth = maxDepth0
     depth = maxDepth
-    seen = Set[String]()
-    allguards = Set[String]()
+    seen = Set()
+    allguards = Set()
+    allvcs = Set()
     path = Rel("true")
     out = new PrintWriter(new FileOutputStream("out.smt"))
 
@@ -182,6 +266,8 @@ trait Z3LogicBase extends EmbeddedControls {
     out.println("(echo \"test with guards -- functions unreachable\")")
     for (g <- allguards)
       out.println(s"(assert (not $g))")
+    if (allvcs.nonEmpty)
+      out.println(s"(assert (not ${allvcs.reduce((a,b) => Rel(s"(and $a $b)"))}))")
     out.println(s"(assert $r)")
     out.println(s"(check-sat)")
 
@@ -193,6 +279,8 @@ trait Z3LogicBase extends EmbeddedControls {
 
     out.println(s"(push)")
     out.println("(echo \"test without guards\")")
+    if (allvcs.nonEmpty)
+      out.println(s"(assert (not ${allvcs.reduce((a,b) => Rel(s"(and $a $b)"))}))")
     out.println(s"(assert $r)")
     out.println(s"(check-sat)")
 
@@ -377,6 +465,57 @@ class TestZ3L_Lists extends FunSuite with Z3LogicBase {
 }
 
 
+class TestZ3L_Verif extends FunSuite with Z3LogicBase {
+
+  /* ------- basic verification ------- */
+
+  test("verif1") {
+    def test1: VFun[Int,Int] = vfun("test1") { x => 
+      require(x > 0) { // > 0 ok, >= 0 fails
+        x - 1
+      } ensuring { _ >= 0 }
+    }
+
+    test1.verify()
+
+    def test2: VFun[Int,Int] = vfun("test2") { x => 
+      require(x > 0) { // > 0 ok, >= 0 fails
+        test1(x)
+      } ensuring { _ >= 0 }
+    }
+
+    test2.verify()
+
+    def test2b: VFun[Int,Int] = vfun("test2b") { x => 
+      require(x >= 0) { // > 0 ok, >= 0 fails
+        test1(x)
+      } ensuring { _ >= 0 }
+    }
+
+    test2b.verifyFail()
+
+    // ---
+
+    def test3: VFun[Int,Int] = vfun("test3") { x => 
+      require(false) {
+        666
+      } ensuring { _ => 0 > 1 }
+    }
+
+    test3.verify() // from false we can prove anything
+
+    def test4: VFun[Int,Int] = vfun("test4") { x => 
+      require(true) {
+        test3(x)
+      } ensuring { _ => true }
+    }
+
+    test4.verifyFail(0) // but we can't use false ...
+    test4.verifyFail(1)
+    test4.verifyFail(3)
+  }
+
+}
 
 
 class TestZ3L_Types extends FunSuite with Z3LogicBase {
@@ -443,142 +582,21 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
         !stm
       }
     }
-
   }
 
 
   test("subtpRefl2") {
 
-    // a function A => C that we can (1) apply and (2) verify
-    trait VFun[A,C] {
-      def apply(x: Exp[A]): Exp[C]
+    // alternative version using pre/post cond API
 
-      def verify(d: Int = 3): Unit
-      def verifyFail(d: Int = 3): Unit
-    }
-
-    // a function body with pre and postconditions
-    trait VBody[C] { self =>
-      def precondition: Exp[Boolean]
-      def apply: Exp[C]
-      def postcondition: Exp[C] => Exp[Boolean]
-    }
-
-    // syntactic sugar: require(pre) { body } ensuring(res => post)
-    def require[C](pre: => Exp[Boolean])(body: => Exp[C]) = new VBody[C] { self =>
-      def precondition = pre
-      def apply = body
-      def postcondition = res => true
-      def ensuring(f: Exp[C] => Exp[Boolean]) = new VBody[C] {
-        def precondition = self.precondition
-        def apply = self.apply
-        def postcondition = f
-      }
-      def holds(implicit ev: Exp[C] <:< Exp[Boolean]) = ensuring(res => res)
-    }
-
-
-    var allvcs: Set[Exp[Boolean]] = Set()
-
-    def assert(c: Exp[Boolean]): Unit = {
-      val vc = reflect[Boolean](s"(=> $path $c)")
-      allvcs += vc
-      zprintln(s"(assert $vc)") // is this required?
-      path = Exp(s"(and $path $c)")
-    }
-
-    def assume(c: Exp[Boolean]): Unit = {
-      val vc = Exp[Boolean](s"(=> $path $c)")
-      path = Exp(s"(and $path $c)")
-    }
-
-
-    def vfun[A:Typ,C:Typ](name: String)(f: Exp[A] => VBody[C]): VFun[A,C] = new VFun[A,C] {
-      def apply(x: Exp[A]) = {
-        val body = f(x)
-        val save = path
-        val pre = body.precondition
-        assert(pre)
-        val r = fun[A,A,C](name)((x,y)=>f(x).apply) apply (x,fresh)
-        val post = body.postcondition(r)
-        assert(post)
-        r
-      }
-
-      def verify(d: Int = 3) = expectResult("unsat")(run(d))
-      def verifyFail(d: Int = 3) = assert("unsat" != run(d))
-      def run(d: Int) = runD[A](d) { x =>
-        allvcs = Set()
-        val body = f(x)
-
-        val pre = body.precondition
-        assume(pre)
-        val post = body.postcondition(body.apply)
-        assert(post)
-
-        //println(allvcs)
-        val vcs = allvcs.reduce(_ & _)
-        !vcs
-      }
-    }
-
-
-
-    def subtpRefl2: VFun[Type,Boolean] = vfun("subtp-refl") { t1 => 
+    def subtpRefl: VFun[Type,Boolean] = vfun("subtp-refl") { t1 => 
       require(true) {
-      {
         !isArrow(t1) ||
-        isArrow(t1) && subtpRefl2(arg(t1)) && subtpRefl2(res(t1))
-      } && subtp(t1,t1)
-      } ensuring(res => res)
+        isArrow(t1) && subtpRefl(arg(t1)) && subtpRefl(res(t1))
+      } ensuring(res => subtp(t1,t1))
     }
 
-    subtpRefl2.verify()
-
-
-    def test1: VFun[Int,Int] = vfun("test1") { x => 
-      require(x > 0) { // > 0 ok, >= 0 fails
-        x - 1
-      } ensuring { _ >= 0 }
-    }
-
-    test1.verify()
-
-    def test2: VFun[Int,Int] = vfun("test2") { x => 
-      require(x > 0) { // > 0 ok, >= 0 fails
-        test1(x)
-      } ensuring { _ >= 0 }
-    }
-
-    test2.verify()
-
-    def test2b: VFun[Int,Int] = vfun("test2b") { x => 
-      require(x >= 0) { // > 0 ok, >= 0 fails
-        test1(x)
-      } ensuring { _ >= 0 }
-    }
-
-    test2b.verifyFail()
-
-    // ---
-
-    def test3: VFun[Int,Int] = vfun("test3") { x => 
-      require(false) {
-        666
-      } ensuring { _ => 0 > 1 }
-    }
-
-    test3.verify() // from false we can prove anything
-
-    def test4: VFun[Int,Int] = vfun("test4") { x => 
-      require(true) {
-        test3(x)
-      } ensuring { _ => true }
-    }
-
-    test4.verifyFail(0) // but we can't use false ...
-    test4.verifyFail(1)
-    test4.verifyFail(3)
+    subtpRefl.verify()
   }
 
 }

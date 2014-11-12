@@ -25,7 +25,7 @@ Target: x86_64-apple-darwin13.3.0
 Thread model: posix
 ```
 
-  * [`brew`](http://brew.sh/)` install gcc49`
+  * [`brew`](http://brew.sh/)` install gcc`
   * `sudo mv /usr/bin/gcc /usr/bin/gcc-mac`
   * `ln -s /usr/local/bin/gcc-4.9 /usr/local/bin/gcc`
   * `sudo ln -s /usr/local/bin/gcc /usr/bin/gcc`

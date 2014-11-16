@@ -62,7 +62,7 @@ Thread model: posix
   * `sbt package` (again on Mac OS X, to ensure `lib-bin/libscalaz3.dylib` is created)
   * `cd ../scalogno`
 
-* SBT configuration
+* SBT configuration (deprecated, no longer needed)
   * Ensure `.sbtconfig` gives enough stack space to the JVM. Here is my configuration, `more ~/.sbtconfig`:
 
 ```SBT_OPTS="-Xms6G -Xmx6G -Xss10M -XX:MaxPermSize=6G -XX:+UseParallelGC"```

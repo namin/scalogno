@@ -1,6 +1,7 @@
 import scala.language.implicitConversions
 
 import java.io._
+import org.scalatest._
 
 object Z3 {
   var out: PrintWriter = new PrintWriter(new FileOutputStream("out.smt"))
@@ -56,7 +57,7 @@ trait SymProgram extends EmbeddedControls {
 //    zprintln(s"(define-const x${nVars} ${implicitly[Typ[T]]} ($value))"); nVars += 1;
     val v = fresh[T]
     zprintln(s"(assert (= $v ($value)))")
-    println(s"\t $v = ($value)")
+//    println(s"\t $v = ($value)")
     v
   }
 
@@ -164,45 +165,42 @@ trait SymProgram extends EmbeddedControls {
 
 
 
-object Test extends SymProgram {
+class TestSymbolic extends FunSuite with SymProgram {
   def myFunction(x: Sym[Int], y: Sym[Int]): Sym[Int] = {
     x + y;
   }
 
-   def reversePositive(xs: Sym[List[Sym[Int]]]): Sym[List[Sym[Int]]] = {
-     var newlist = List[Sym[Int]]()
+  def reversePositive(xs: Sym[List[Sym[Int]]]): Sym[List[Sym[Int]]] = {
+    var newlist = List[Sym[Int]]()
 
-     for( x <- xs )
-      // newlist = if (x >= 0) x :: newlist else newlist
+    for( x <- xs )
+     // newlist = if (x >= 0) x :: newlist else newlist
 
-      // "imperative" version
-      //if (x >= 0)
-        newlist = x :: newlist
-        // What if we have multiple lines?
+     // "imperative" version
+     //if (x >= 0)
+       newlist = x :: newlist
+       // What if we have multiple lines?
 
-     newlist
-   }
+    newlist
+  }
 
 
-  def main(args : Array[String]) {
-    val a = fresh[Int]
-    val b = myFunction(3, a)
-    println(myFunction(4,5))
+  test("concrete values") {
 
-    val c = (1 == b)
+    // Calling with concrete values returns a concrete value
+    expectResult(Const(9)) {
+      myFunction(4,5)
+    }
 
-    assert(c)
-    println(b)
+    expectResult(Const(-3)) {
+      val result = reversePositive(List(3,-5,1,-3))
 
-    val list = List(3,-5,1,-3)
-    println(list)
-    println(reversePositive(list))
+      // We can extract the result
+      val list   = result match { case Union(guards, _) => guards(true) }
 
-    val symbolicList : List[Sym[Int]] = List(3,a,1,-3)
-    println(symbolicList)
-    println(reversePositive(symbolicList))
+      list.head
+    }
 
-    Z3.run()
   }
 }
 

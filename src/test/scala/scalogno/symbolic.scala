@@ -3,21 +3,74 @@ import scala.language.implicitConversions
 import java.io._
 import org.scalatest._
 
+
+// This is growing too much. Maybe it's time to use ScalaZ3?
 object Z3 {
   var out: PrintWriter = new PrintWriter(new FileOutputStream("out.smt"))
-  def zprintln(x:Any) = out.println(x)
+  var constraints: List[String] = Nil
+
+  def zprintln(x:String) { constraints = constraints :+ x }
+
+  var model: Map[String, Any] = Map.empty
 
   def run() {
     import scala.sys.process._
 
-    zprintln("(check-sat)")
-    zprintln("(get-model)")
+    constraints foreach(out.println(_))
+    out.println("(check-sat)")
+    out.println("(get-model)")
 
     out.close
     import scala.sys.process._
-    val s = Process("z3 -smt2 out.smt").lines_!
+    val p = Process("z3 -smt2 out.smt")
 
-    s foreach println
+    model = Z3Parser.parse(p.!!)
+    out = new PrintWriter(new FileOutputStream("out.smt"))
+  }
+
+  import scala.util.parsing.combinator.syntactical.StandardTokenParsers
+  import scala.util.parsing.input._
+  object Z3Parser extends StandardTokenParsers {
+    lexical.reserved ++= List("sat", "unsat", "model", "define", "fun", "Bool", "Int", "true", "false")
+    lexical.delimiters ++= List("(", ")", "-")
+
+    import lexical.NumericLit
+
+    def model: Parser[Map[String, Any]] = (
+        "sat" ~ "(" ~ "model" ~> rep(defineFun) <~ ")" ^^
+          { case binds => binds.toMap }
+      | failure("unable to parse output from Z3")
+    )
+
+    def defineFun: Parser[Pair[String, Any]] = (
+      defineInt | defineBool
+    )
+
+    def defineInt: Parser[Pair[String, Any]] = (
+        "(" ~ "define" ~ "-" ~ "fun" ~> ident ~ ("(" ~ ")" ~ "Int" ~> numericLit <~ ")") ^^
+          { case name ~ value => name.toString -> value.toInt }
+      | "(" ~ "define" ~ "-" ~ "fun" ~> ident ~ ("(" ~ ")" ~ "Int" ~ "(" ~ "-" ~> numericLit <~ ")" ~ ")") ^^
+          { case name ~ value => name.toString -> -value.toInt }
+    )
+
+    def defineBool: Parser[Pair[String, Any]] = (
+        "(" ~ "define" ~ "-" ~ "fun" ~> ident <~ "(" ~ ")" ~ "Bool" ~ "true" ~ ")" ^^
+          { case name => name.toString -> true }
+      | "(" ~ "define" ~ "-" ~ "fun" ~> ident <~ "(" ~ ")" ~ "Bool" ~ "false" ~ ")" ^^
+          { case name => name.toString -> false }
+    )
+
+
+    def parse(stream: String): Map[String, Any] = {
+      val tokens = new lexical.Scanner(stream)
+      phrase(model)(tokens) match {
+        case Success(map, _) =>
+          map
+        case e =>
+          println(e)
+          Map.empty
+      }
+    }
   }
 }
 
@@ -27,13 +80,11 @@ trait SymProgram extends EmbeddedControls {
 
   class Sym[T]
   // Isn't this some kind of monad? Reminds me of the Maybe monad. It is "maybe" concrete
+
   case class Const[T](x: T) extends Sym[T] { override def toString = x.toString }
-  // TODO: a const is actually a Union with one guard (true). How can we reflect this?
-  case class Var[T](name: String) extends Sym[T] { override def toString = name }
-  case class Union[T](guards: Map[Sym[Boolean], T], varGuards: Map[Sym[Boolean], Var[T]]) extends Sym[T]
+  case class Var[T:Typ](name: String) extends Sym[T] { override def toString = name }
+  case class Union[T](guards: Map[Sym[Boolean], T]) extends Sym[T]
     { override def toString = guards.toString }
-  // TODO: implement union as a list of "guards", which should be a new type
-  // that can either be of the form (cond -> value) or (cond -> variable)
 
 
   class Typ[T]
@@ -44,7 +95,7 @@ trait SymProgram extends EmbeddedControls {
   implicit def lift[T](x: T): Sym[T] = x match {
    case _ : Int     => Const[T](x)
    case _ : Boolean => Const[T](x)
-   case _           => Union[T]( Map(lift(true) -> x), Map.empty )
+   case _           => Const[T](x)
   }
 
 
@@ -89,17 +140,14 @@ trait SymProgram extends EmbeddedControls {
     lift(x map lift)
   }
 
-  // Not sure of what is the right way to to this
-  implicit def traversableToOps[A, T[A] <: Traversable[A]](x: Sym[T[A]]) =
-    TraversableOps[T[A], A](x)
-  implicit class TraversableOps[T <: Traversable[A], A](x: Sym[T]) {
+  implicit class TraversableOps[T[A] <: Traversable[A], A](x: Sym[T[A]]) {
     def foreach(f: (A) => Unit): Unit = x match {
-      case Union(guards, varGuards) =>
-        // TODO: other cases
-        guards(true).foreach(f)
+      case Const(v) =>
+        v.foreach(f)
+      case Union(guards) =>
+        guards.values map (_.foreach(f))
     }
   }
-
 
   implicit class IntOps(x: Sym[Int]) {
     def >(y: Sym[Int]) : Sym[Boolean] = (x,y) match {
@@ -161,6 +209,24 @@ trait SymProgram extends EmbeddedControls {
   //   println(rhs)
   // }
 
+
+
+
+  // In some cases it might be fun to turn solve implicit
+  def solve[T](x: Sym[T]): T = x match {
+    case Const(value) => value
+    case Union(guards) => guards.values.head // We just want one
+    case Var(name) =>
+      // TODO: shouldn't run every time
+      Z3.run()
+      Z3.model(name) match {
+        case value : T =>
+          value
+        case _ =>
+          throw new Exception("Couldn't find value for" + name)
+      }
+  }
+
 }
 
 
@@ -195,12 +261,31 @@ class TestSymbolic extends FunSuite with SymProgram {
     expectResult(Const(-3)) {
       val result = reversePositive(List(3,-5,1,-3))
 
-      // We can extract the result
-      val list   = result match { case Union(guards, _) => guards(true) }
-
-      list.head
+      // Solving a concrete value gives a concrete value
+      solve(result).head
     }
 
   }
+
+  test("solve") {
+    expectResult(42) {
+      val a = fresh[Int]
+      assert(a == 42)
+
+      solve(a)
+    }
+
+    expectResult(-2) {
+      val a = fresh[Int]
+      val b = myFunction(3, a)
+
+      val c = (1 == b)
+
+      assert(c)
+      solve(a)
+    }
+
+  }
+
 }
 

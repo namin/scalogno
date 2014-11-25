@@ -312,14 +312,14 @@ class TestSymbolic extends FunSuite with SymProgram {
       val a = fresh[Int]
       val result = reversePositive(List(3,a,1,-3) : List[Sym[Int]])
       assert( a > 0 )
-      (solve(result) map solve).length
+      solve(result).length
     }
 
     expectResult(2) {
       val a = fresh[Int]
       val result = reversePositive(List(3,a,1,-3) : List[Sym[Int]])
       assert( a < 0 )
-      (solve(result) map solve).length
+      solve(result).length
     }
 
   }

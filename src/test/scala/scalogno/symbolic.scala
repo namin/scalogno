@@ -1,4 +1,5 @@
 import scala.language.implicitConversions
+import scala.language.higherKinds
 
 import java.io._
 import org.scalatest._
@@ -83,9 +84,17 @@ trait SymProgram extends EmbeddedControls {
 
   case class Const[T](x: T) extends Sym[T] { override def toString = x.toString }
   case class Var[T:Typ](name: String) extends Sym[T] { override def toString = name }
-  case class Union[T](guards: Map[Sym[Boolean], T]) extends Sym[T]
-    { override def toString = guards.toString }
+  case class Union[T](guards: Map[Sym[Boolean], T]) extends Sym[T] {
+    override def toString = guards.toString
 
+    def ++(other: Union[T]): Union[T] =
+      Union[T]( guards ++ other.guards )
+  }
+
+  // TODO: The Vars can only be boolean or integers, and we don't keep
+  // Unions of them. Shouldn't the types reflect this? What happens if
+  // we have a Union of Ints or Bools? We should do something like
+  // x2 = ite(b0, x0, x1) instead of Unions
 
   class Typ[T]
 
@@ -118,14 +127,6 @@ trait SymProgram extends EmbeddedControls {
 
   def assert(b: Sym[Boolean]): Unit = zprintln(s"(assert $b)")
 
-  def infix_+(lhs: Sym[Int], rhs: Sym[Int]): Sym[Int] =
-    (lhs, rhs) match {
-      case (Const(x), Const(y)) =>
-        Const(x + y)
-      case _ =>
-        newvar(s"+ $rhs $lhs")
-    }
-
 
   // implicit def liftElements[A, T[A] <: Traversable[A]](x: T[A]): T[Sym[A]] = {
   //   val temp = ((x : T[A]) map : )lift
@@ -149,14 +150,30 @@ trait SymProgram extends EmbeddedControls {
     }
   }
 
+  implicit class ListOps[A](x: Sym[List[A]]) {
+    def ::(head: A): Sym[List[A]] = x match {
+      case Const(tail) => Const(head :: tail)
+      case Union(guards) =>
+        Union( guards mapValues { tail => (head :: tail) } )
+    }
+  }
+
   implicit class IntOps(x: Sym[Int]) {
     def >(y: Sym[Int]) : Sym[Boolean] = (x,y) match {
       case (Const(a),Const(b)) => a > b
       case _                   => newvar(s"> $x $y")
     }
+    def <(y: Sym[Int]) : Sym[Boolean] = (x,y) match {
+      case (Const(a),Const(b)) => a < b
+      case _                   => newvar(s"< $x $y")
+    }
     def >=(y: Sym[Int]) : Sym[Boolean] = (x,y) match {
-      case (Const(a),Const(b)) => a > b
+      case (Const(a),Const(b)) => a >= b
       case _                   => newvar(s">= $x $y")
+    }
+    def <=(y: Sym[Int]) : Sym[Boolean] = (x,y) match {
+      case (Const(a),Const(b)) => a >= b
+      case _                   => newvar(s"<= $x $y")
     }
     def +(y: Sym[Int]) : Sym[Int] = (x,y) match {
       case (Const(a),Const(b)) => a + b
@@ -180,29 +197,22 @@ trait SymProgram extends EmbeddedControls {
   }
 
 
-  // def __ifThenElse[T](cond: Sym[Boolean], thenp: => T, elsep: => T): Sym[T] = cond match {
-  //   case Const(true)  => Const(thenp)
-  //   case Const(false) => Const(elsep)
-  //   case Var(_)       => Union( Map(cond -> thenp, !cond -> elsep) )
-  // }
-
-  // def __ifThenElse[T](cond: Sym[Boolean], thenp: => Sym[T], elsep: => Sym[T]): Sym[T] = cond match {
-  //   case Const(true)  => thenp
-  //   case Const(false) => elsep
-  //   case Var(_) =>
-      // TODO: operation to extend unions
-  //     Union(
-  //       (thenp match {
-  //         case Const(_) | Var(_) => Map( cond -> thenp )
-  //         case Union(guards) =>
-  //           guards map { case (k,v) => (cond && k) -> v }
-  //       }) ++
-  //       (elsep match {
-  //         case Const(_) | Var(_) => Map( !cond -> thenp )
-  //         case Union(guards) =>
-  //           guards map { case (k,v) => (!cond && k) -> v }
-  //       }))
-  // }
+  def __ifThenElse[A, T <: Sym[A]](cond: Sym[Boolean], thenp: => T, elsep: => T): Sym[A] = cond match {
+    case Const(true)  => thenp
+    case Const(false) => elsep
+    case Var(_) =>
+      // TODO: this operation to extend unions should be implemented in the class Union
+        (thenp match {
+          case Const(v) => Union(Map( cond -> v ))
+          case Union(guards) =>
+            Union( guards map { case (k, v) => (cond && k) -> v } )
+        }) ++
+        (elsep match {
+          case Const(v) => Union(Map( !cond -> v ))
+          case Union(guards) =>
+            Union( guards map { case (k, v) => (!cond && k) -> v } )
+        })
+  }
 
   // def __assign[Sym[T]](lhs: Sym[T], rhs: Sym[T]): Unit = {
   //   println(lhs)
@@ -215,12 +225,18 @@ trait SymProgram extends EmbeddedControls {
   // In some cases it might be fun to turn solve implicit
   def solve[T](x: Sym[T]): T = x match {
     case Const(value) => value
-    case Union(guards) => guards.values.head // We just want one
+    case Union(guards) =>
+      guards collectFirst { case Pair(k,v) if solve(k) => v } match {
+        case Some(value) => value
+        case None => throw new Exception("No guard was true for Union value")
+      }
     case Var(name) =>
       // TODO: shouldn't run every time
       Z3.run()
       Z3.model(name) match {
         case value : T =>
+          // TODO: Gives warning due to type erasure
+          // maybe we could change Z3.model into something like Map[Var[T], T]
           value
         case _ =>
           throw new Exception("Couldn't find value for" + name)
@@ -230,22 +246,33 @@ trait SymProgram extends EmbeddedControls {
 }
 
 
-
 class TestSymbolic extends FunSuite with SymProgram {
   def myFunction(x: Sym[Int], y: Sym[Int]): Sym[Int] = {
     x + y;
   }
 
   def reversePositive(xs: Sym[List[Sym[Int]]]): Sym[List[Sym[Int]]] = {
-    var newlist = List[Sym[Int]]()
+    var newlist : Sym[List[Sym[Int]]] = List[Sym[Int]]()
 
     for( x <- xs )
-     // newlist = if (x >= 0) x :: newlist else newlist
+//      newlist = x :: newlist
+      newlist = if (x >= 0) x :: newlist else newlist
+//      newlist = __ifThenElse[Sym[Int]](x >= 0, x :: newlist, newlist)
 
      // "imperative" version
      //if (x >= 0)
-       newlist = x :: newlist
+       // newlist = x :: newlist
        // What if we have multiple lines?
+
+    newlist
+  }
+
+
+  def reverse(xs: Sym[List[Sym[Int]]]): Sym[List[Sym[Int]]] = {
+    var newlist = List[Sym[Int]]()
+
+    for( x <- xs )
+       newlist = x :: newlist
 
     newlist
   }
@@ -259,15 +286,46 @@ class TestSymbolic extends FunSuite with SymProgram {
     }
 
     expectResult(Const(-3)) {
-      val result = reversePositive(List(3,-5,1,-3))
+      val result = reverse(List(3,-5,1,-3))
 
       // Solving a concrete value gives a concrete value
       solve(result).head
     }
 
+    expectResult(List(1,3)) {
+      val result = reversePositive(List(3,-5,1,-3))
+      solve(result) map solve
+    }
+
+  }
+
+  test("symbolic values") {
+
+
+    expectResult(Const(-3)) {
+      val result = reverse(List(3,5,fresh[Int],fresh[Int],-3) : List[Sym[Int]])
+
+      solve(result).head
+    }
+
+    expectResult(3) {
+      val a = fresh[Int]
+      val result = reversePositive(List(3,a,1,-3) : List[Sym[Int]])
+      assert( a > 0 )
+      (solve(result) map solve).length
+    }
+
+    expectResult(2) {
+      val a = fresh[Int]
+      val result = reversePositive(List(3,a,1,-3) : List[Sym[Int]])
+      assert( a < 0 )
+      (solve(result) map solve).length
+    }
+
   }
 
   test("solve") {
+
     expectResult(42) {
       val a = fresh[Int]
       assert(a == 42)

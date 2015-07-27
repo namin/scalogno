@@ -56,6 +56,11 @@ trait Z3LogicBase extends EmbeddedControls {
   def succ(t: Exp[Int]): Exp[Int] = Exp(s"(+ 1 $t)")
   def nil[T]: Exp[List[T]] = Exp(s"nil")
   def zero: Exp[Int] = Exp(s"0")
+
+  implicit class ListOps[T](x: Exp[List[T]]) {
+    def head: Exp[T] = Exp(s"(head $x)")
+    def tail: Exp[List[T]] = Exp(s"(tail $x)")
+  }
   
   implicit class TermOps[T](x: Exp[T]) {
     def !==(y: Exp[T]): Rel = Rel(s"(not (= $x $y))")
@@ -82,6 +87,7 @@ trait Z3LogicBase extends EmbeddedControls {
   implicit class IntOps(x: Exp[Int]) {
     def >(y: Exp[Int]) = Rel(s"(> $x $y)")
     def >=(y: Exp[Int]) = Rel(s"(>= $x $y)")
+    def *(y: Exp[Int]) = Exp[Int](s"(* $x $y)")
     def +(y: Exp[Int]) = Exp[Int](s"(+ $x $y)")
     def -(y: Exp[Int]) = Exp[Int](s"(- $x $y)")
   }
@@ -106,14 +112,14 @@ trait Z3LogicBase extends EmbeddedControls {
         (2) to be the fastest due to better sharing)
       */
       def maybeFlatten(s: String): Rel = 
-        if (mode == "flattenPaths") Exp[Boolean](s) else reflect[Boolean](s)
+        if (mode != "flattenPaths") Exp[Boolean](s) else reflect[Boolean](s)
 
       path = maybeFlatten(s"(and $save $c)")
       val x1 = a
       path = maybeFlatten(s"(and $save (not $c))")
       val y1 = b
       path = save
-      reflect(s"(ite $c $x1 $y1)")
+      Exp(s"(ite $c $x1 $y1)")
       //val r = fresh[T]
       //zprintln(s"(assert (=> $c (= ($r $x1))))")
       //zprintln(s"(assert (=> (not $c) (= ($r $y1))))")
@@ -134,17 +140,17 @@ trait Z3LogicBase extends EmbeddedControls {
       depth -= 1
       zprintln(s";; IN  ($name $x $y)")
       val q = f(x,y)
-      val r = reflect[C](s"($name $x $y)") // do we need the symbolic name??
+      //val r = reflect[C](s"($name $x $y)") // symbolic name needed to constrain function space
       zprintln(s";; OUT ($name $x $y)")
-      zprintln(s"(assert (= $r $q))")
+      zprintln(s"(assert (=> $path (= ($name $x $y) $q)))")
       depth += 1
-      r
+      q
       //q
     } else {
       allguards += s"$path"
       zprintln(s";; ABORT ($name $x $y) ") //guard $path")
       //rel(s"(=> $path ($name $x $y))")
-      reflect[C](s"($name $x $y)")
+      Exp[C](s"($name $x $y)")
     }
   }
 
@@ -165,13 +171,14 @@ trait Z3LogicBase extends EmbeddedControls {
   def assert(c: Exp[Boolean]): Unit = {
     val vc = reflect[Boolean](s"(=> $path $c)")
     allvcs += vc
-    zprintln(s"(assert $vc)") // is this required?
-    path = Exp(s"(and $path $c)")
+    //zprintln(s"(assert $vc)") // is this required?
+    path = rel(s"(and $path $c)")
   }
 
   def assume(c: Exp[Boolean]): Unit = {
-    //val vc = Exp[Boolean](s"(=> $path $c)")
-    path = Exp(s"(and $path $c)")
+    val vc = Exp[Boolean](s"(=> $path $c)")
+    zprintln(s"(assert $vc)") // is this required?
+    path = rel(s"(and $path $c)")
   }
 
 
@@ -214,14 +221,13 @@ trait Z3LogicBase extends EmbeddedControls {
       assert(pre)
       val r = fun[A,A,C](name)((x,y)=>f(x).apply) apply (x,fresh)
       val post = body.postcondition(r)
-      assert(post)
+      assume(post)
       r
     }
 
-    def verify(d: Int = 3) = assert("unsat" == run(d))
-    def verifyFail(d: Int = 3) = assert("unsat" != run(d))
-    def run(d: Int) = runD[A](d) { x =>
-      allvcs = Set()
+    def verify(d: Int = 3) = Predef.assert("unsat" == run(d))
+    def verifyFail(d: Int = 3) = Predef.assert("unsat" != run(d)) // TODO: disallow maybe
+    def run(d: Int) = {val x = runD[A](d) { x =>
       val body = f(x)
 
       val pre = body.precondition
@@ -229,7 +235,7 @@ trait Z3LogicBase extends EmbeddedControls {
       val post = body.postcondition(body.apply)
       assert(post)
       true
-    }
+    }; println(x); x}
   }
 
 
@@ -348,7 +354,7 @@ class TestZ3L_Lists extends FunSuite with Z3LogicBase {
       }
     }
 
-    expectResult("((insert 4 (insert 3 nil)))") {
+    expectResult("((insert 3 (insert 4 nil)))") {
       run[List[Int]] { x =>
         size(x, 2)
       }
@@ -513,6 +519,61 @@ class TestZ3L_Verif extends FunSuite with Z3LogicBase {
     test4.verifyFail(0) // but we can't use false ...
     test4.verifyFail(1)
     test4.verifyFail(3)
+
+
+    def test5: VFun[Int,Int] = vfun("test5") { x => 
+      require(true) {
+        test3(x)
+      } ensuring { _ => false }
+    }
+
+    test5.verifyFail()
+
+  }
+
+  test("verif3") {
+    // we would like to verify equality of two factorial implementations:
+
+    def fact1: Fun2[Int,Int,Int] = fun("fact1") { (n, XX) =>
+      if (n > 0) n * fact1(n-1,XX) else 1
+    }
+
+    def fact2: Fun2[Int,Int,Int] = fun("fact2") { (n, a) =>
+      if (n > 0) fact2(n-1, a * n) else a
+    }
+
+    // unfortunately, this is tricky, because we would need an inner induction (forall a)
+
+    expectResult("maybe") { // <--- want "unsat" here, eventually
+      runD[Int](4) { n =>
+
+        val a = 100: Exp[Int] // quantify
+
+        val stm =   if ((a * fact1(n-1,0) === fact2(n-1,a)) 
+                         && (a * n * fact1(n-1,0) === fact2(n-1,a * n))) {
+                     ((a * fact1(n,0) === fact2(n,a)) 
+                         && (a * (n+1) * fact1(n,0) === fact2(n,a * (n + 1))))
+                    } else true
+
+        !stm
+      }
+    }
+
+
+    def factLemma: Fun2[Int,Int,Boolean] = fun("factLemma") { (n, a) =>
+      (((0:Exp[Int]) > n) || (n > 0) && factLemma(n-1,a*n)) ===> (a * fact1(n,0) === fact2(n,a))
+    }
+
+    def fact3v: VFun[Int,Boolean] = vfun("fact3v") { xs =>
+      require(true) { 
+        (fact1(1,0) * xs === fact2(1,xs)) && 
+        (fact1(2,0) * xs === fact2(2,xs)) &&
+        (fact1(4,0) * xs === fact2(4,xs))
+      } holds
+    }
+
+    fact3v.verify(5)
+
   }
 
 }
@@ -547,7 +608,7 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
 
   test("types1") {
 
-    expectResult("(top)") {
+    expectResult("((arrow bot top))") {
       runD[Type](4) { t1 =>
         subtp(arrow(nat,nat),t1)
       }
@@ -591,12 +652,12 @@ class TestZ3L_Types extends FunSuite with Z3LogicBase {
 
     def subtpRefl: VFun[Type,Boolean] = vfun("subtp-refl") { t1 => 
       require(true) {
-        !isArrow(t1) ||
-        isArrow(t1) && subtpRefl(arg(t1)) && subtpRefl(res(t1))
-      } ensuring(res => subtp(t1,t1))
+        (!isArrow(t1) ||
+        isArrow(t1) && subtpRefl(arg(t1)) && subtpRefl(res(t1))) && subtp(t1,t1)
+      } ensuring(res => res)
     }
 
-    subtpRefl.verify()
+    subtpRefl.verify(3)
   }
 
 }
@@ -1037,7 +1098,7 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
   }
 
   test("typeinv1") {
-    expectResult("((Lambda 3 T1 (Var 3)))") {
+    expectResult("((Lambda 0 T1 (Var 0)))") {
       runD[Term](3) { x1 =>
         val INT = T1
         val tpe = Arrow(INT, INT)
@@ -1061,7 +1122,7 @@ class TestZ3L_TypeCheck extends FunSuite with Z3LogicBase {
   }
 
   test("typeinv3") {
-    expectResult("((Lambda 5 (Tuple T1 T2) (Fst (Var 5))))") {
+    expectResult("((Lambda 0 (Tuple T1 T2) (Fst (Var 0))))") {
       // A & B => A
       runD[Term](4) { x1 =>
         val tpe = Arrow(Tuple(T1,T2), T1)

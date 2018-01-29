@@ -32,7 +32,7 @@ Thread model: posix
 
 * Set up `z3` in sibling directory
   * `cd ..` (from this `scalogno` directory)
-  * `git clone https://git01.codeplex.com/z3`
+  * `git clone https://github.com/Z3Prover/z3.git`
   * `cd z3`
   * `git checkout rc`
   * `python scripts/mk_make.py`

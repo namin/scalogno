@@ -39,12 +39,12 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
       }
     }
     expectResult(List(
-      "pair(nil,cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil)))))))", 
-      "pair(cons(a,nil),cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))", 
-      "pair(cons(a,cons(b,nil)),cons(c,cons(d,cons(e,cons(f,nil)))))", 
-      "pair(cons(a,cons(b,cons(c,nil))),cons(d,cons(e,cons(f,nil))))", 
-      "pair(cons(a,cons(b,cons(c,cons(d,nil)))),cons(e,cons(f,nil)))", 
-      "pair(cons(a,cons(b,cons(c,cons(d,cons(e,nil))))),cons(f,nil))", 
+      "pair(nil,cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil)))))))",
+      "pair(cons(a,nil),cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))",
+      "pair(cons(a,cons(b,nil)),cons(c,cons(d,cons(e,cons(f,nil)))))",
+      "pair(cons(a,cons(b,cons(c,nil))),cons(d,cons(e,cons(f,nil))))",
+      "pair(cons(a,cons(b,cons(c,cons(d,nil)))),cons(e,cons(f,nil)))",
+      "pair(cons(a,cons(b,cons(c,cons(d,cons(e,nil))))),cons(f,nil))",
       "pair(cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil)))))),nil)"
     )) {
       run[(List[String],List[String])] { q =>
@@ -57,12 +57,12 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
 
   test("pair") {
     expectResult(List(
-      "pair(nil,cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil)))))))", 
-      "pair(cons(a,nil),cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))", 
-      "pair(cons(a,cons(b,nil)),cons(c,cons(d,cons(e,cons(f,nil)))))", 
-      "pair(cons(a,cons(b,cons(c,nil))),cons(d,cons(e,cons(f,nil))))", 
-      "pair(cons(a,cons(b,cons(c,cons(d,nil)))),cons(e,cons(f,nil)))", 
-      "pair(cons(a,cons(b,cons(c,cons(d,cons(e,nil))))),cons(f,nil))", 
+      "pair(nil,cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil)))))))",
+      "pair(cons(a,nil),cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))",
+      "pair(cons(a,cons(b,nil)),cons(c,cons(d,cons(e,cons(f,nil)))))",
+      "pair(cons(a,cons(b,cons(c,nil))),cons(d,cons(e,cons(f,nil))))",
+      "pair(cons(a,cons(b,cons(c,cons(d,nil)))),cons(e,cons(f,nil)))",
+      "pair(cons(a,cons(b,cons(c,cons(d,cons(e,nil))))),cons(f,nil))",
       "pair(cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil)))))),nil)"
     )) {
       run[(List[String],List[String])] {
@@ -92,13 +92,13 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
       }
     }
     expectResult(List(
-      "cons(a,cons(b,cons(a,nil)))", 
-      "cons(a,cons(b,cons(d,nil)))", 
-      "cons(a,cons(e,cons(a,nil)))", 
-      "cons(a,cons(e,cons(d,nil)))", 
-      "cons(d,cons(b,cons(a,nil)))", 
-      "cons(d,cons(b,cons(d,nil)))", 
-      "cons(d,cons(e,cons(a,nil)))", 
+      "cons(a,cons(b,cons(a,nil)))",
+      "cons(a,cons(b,cons(d,nil)))",
+      "cons(a,cons(e,cons(a,nil)))",
+      "cons(a,cons(e,cons(d,nil)))",
+      "cons(d,cons(b,cons(a,nil)))",
+      "cons(d,cons(b,cons(d,nil)))",
+      "cons(d,cons(e,cons(a,nil)))",
       "cons(d,cons(e,cons(d,nil)))"
     )){
       run[List[String]] { q =>
@@ -126,13 +126,13 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
         }
       }
       expectResult(List(
-        "cons(a,cons(b,cons(a,nil)))", 
-        "cons(a,cons(b,cons(d,nil)))", 
-        "cons(a,cons(e,cons(a,nil)))", 
-        "cons(a,cons(e,cons(d,nil)))", 
-        "cons(d,cons(b,cons(a,nil)))", 
-        "cons(d,cons(b,cons(d,nil)))", 
-        "cons(d,cons(e,cons(a,nil)))", 
+        "cons(a,cons(b,cons(a,nil)))",
+        "cons(a,cons(b,cons(d,nil)))",
+        "cons(a,cons(e,cons(a,nil)))",
+        "cons(a,cons(e,cons(d,nil)))",
+        "cons(d,cons(b,cons(a,nil)))",
+        "cons(d,cons(b,cons(d,nil)))",
+        "cons(d,cons(e,cons(a,nil)))",
         "cons(d,cons(e,cons(d,nil)))"
       )){
         run[List[String]] { q =>
@@ -143,7 +143,7 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
       }
 
     } finally {
-      delayedMode = false        
+      delayedMode = false
     }
   }
 
@@ -162,11 +162,11 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
 
   test("lessThan") {
     expectResult(List(
-      "nil", 
-      "cons(z,nil)", 
-      "cons(z,cons(z,x0))", 
-      "cons(z,cons(s(z),nil))", 
-      "cons(z,cons(s(z),cons(z,x0)))", 
+      "nil",
+      "cons(z,nil)",
+      "cons(z,cons(z,x0))",
+      "cons(z,cons(s(z),nil))",
+      "cons(z,cons(s(z),cons(z,x0)))",
       "cons(z,cons(s(z),cons(s(z),x0)))"
     )) {
       run[List[Int]] { q =>
@@ -176,11 +176,11 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
   }
   test("lessThanOrd") {
     expectResult(List(
-      "nil", 
-      "cons(z,nil)", 
-      "cons(z,cons(z,x0))", 
-      "cons(z,cons(s(z),nil))", 
-      "cons(z,cons(s(z),cons(z,x0)))", 
+      "nil",
+      "cons(z,nil)",
+      "cons(z,cons(z,x0))",
+      "cons(z,cons(s(z),nil))",
+      "cons(z,cons(s(z),cons(z,x0)))",
       "cons(z,cons(s(z),cons(s(z),x0)))"
     )) {
       run[List[Int]] { q =>
@@ -270,7 +270,7 @@ trait TestGraphsBase extends MySuite with Base with Engine with NatBase with Lis
   test("graph") {
 
     val g = new Graph[String] {
-      def edge(x:Exp[String],y:Exp[String]) = 
+      def edge(x:Exp[String],y:Exp[String]) =
         (x === "a") && (y === "b") ||
         (x === "b") && (y === "c") ||
         (x === "c") && (y === "a")
@@ -294,7 +294,7 @@ trait TestGraphsBase extends MySuite with Base with Engine with NatBase with Lis
 
   test("trace") {
     val traceG = new Graph[String] {
-      def edge(x:Exp[String],y:Exp[String]) = 
+      def edge(x:Exp[String],y:Exp[String]) =
         (x === "a") && (y === "b") ||
         (x === "b") && (y === "c") ||
         (x === "c") && (y === "a")
@@ -303,10 +303,10 @@ trait TestGraphsBase extends MySuite with Base with Engine with NatBase with Lis
     }
 
     expectResult(List(
-      "pair(b,cons(path(a,b),nil))", 
-      "pair(c,cons(path(b,c),cons(path(a,c),nil)))", 
-      "pair(a,cons(path(c,a),cons(path(b,a),cons(path(a,a),nil))))", 
-      "pair(b,cons(path(a,b),cons(path(c,b),cons(path(b,b),cons(path(a,b),nil)))))", 
+      "pair(b,cons(path(a,b),nil))",
+      "pair(c,cons(path(b,c),cons(path(a,c),nil)))",
+      "pair(a,cons(path(c,a),cons(path(b,a),cons(path(a,a),nil))))",
+      "pair(b,cons(path(a,b),cons(path(c,b),cons(path(b,b),cons(path(a,b),nil)))))",
       "pair(c,cons(path(b,c),cons(path(a,c),cons(path(c,c),cons(path(b,c),cons(path(a,c),nil))))))"
     )) {
       runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
@@ -325,7 +325,7 @@ class TestGraphsDynVars extends TestGraphsBase with ReifyUtilsDynVars
 class TestMetaGraphs extends MySuite with Base with Engine with MetaGraphBase {
 
   val g = new Graph[String] {
-    def edge(x:Exp[String],y:Exp[String]) = 
+    def edge(x:Exp[String],y:Exp[String]) =
       (x === "a") && (y === "b") ||
       (x === "b") && (y === "c") ||
       (x === "c") && (y === "a")
@@ -347,31 +347,31 @@ class TestMetaGraphs extends MySuite with Base with Engine with MetaGraphBase {
     }
 
     expectResult(List(
-      "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil))))", 
-      "cons(to prove,cons(path(b,x0),cons(prove,cons(cons(path(c,x0),nil),nil))))", 
+      "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil))))",
+      "cons(to prove,cons(path(b,x0),cons(prove,cons(cons(path(c,x0),nil),nil))))",
       "cons(to prove,cons(path(c,x0),cons(prove,cons(cons(path(a,x0),nil),nil))))"
     )) {
       run[List[Any]] { q =>
         exists[Goal,List[Goal]] { (head,body) =>
-          q === cons("to prove", cons(head, cons("prove", cons(body, nil)))) && 
+          q === cons("to prove", cons(head, cons("prove", cons(body, nil)))) &&
           pathClause1(g)(head,body)
         }
       }
     }
 
     expectResult(List(
-      "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil))))", 
-      "cons(to prove,cons(path(b,x0),cons(prove,cons(cons(path(c,x0),nil),nil))))", 
+      "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil))))",
+      "cons(to prove,cons(path(b,x0),cons(prove,cons(cons(path(c,x0),nil),nil))))",
       "cons(to prove,cons(path(c,x0),cons(prove,cons(cons(path(a,x0),nil),nil))))"
     )) {
       run[List[Any]] { q =>
-        val clause = existsC[String,String] { (a,b) => pathClause2(g)(a,b) }        
+        val clause = existsC[String,String] { (a,b) => pathClause2(g)(a,b) }
         exists[Goal,List[Goal]] { (head,body) =>
           clause(head,body) && q === cons("to prove", cons(head, cons("prove", cons(body, nil))))
         }
@@ -379,16 +379,16 @@ class TestMetaGraphs extends MySuite with Base with Engine with MetaGraphBase {
     }
 
     expectResult(List(
-      "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))", 
-      "cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil))))", 
-      "cons(to prove,cons(path(b,x0),cons(prove,cons(cons(path(c,x0),nil),nil))))", 
+      "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))",
+      "cons(to prove,cons(path(a,x0),cons(prove,cons(cons(path(b,x0),nil),nil))))",
+      "cons(to prove,cons(path(b,x0),cons(prove,cons(cons(path(c,x0),nil),nil))))",
       "cons(to prove,cons(path(c,x0),cons(prove,cons(cons(path(a,x0),nil),nil))))"
     )) {
       run[List[Any]] { q =>
         exists[Goal,List[Goal]] { (head,body) =>
-          q === cons("to prove", cons(head, cons("prove", cons(body, nil)))) && 
+          q === cons("to prove", cons(head, cons("prove", cons(body, nil)))) &&
           reifyClause(path2(g)(fresh,fresh))(head,body)
         }
       }
@@ -441,8 +441,8 @@ class TestSTLC extends MySuite with Base with Engine with STLC with STLC_Reverse
 
   test("stlc1") {
     expectResult(List(
-      "pair(cons(x0,nil),pair(z,x0))", 
-      "pair(cons(x0,cons(x1,nil)),pair(s(z),x0))", 
+      "pair(cons(x0,nil),pair(z,x0))",
+      "pair(cons(x0,cons(x1,nil)),pair(s(z),x0))",
       "pair(cons(x0,cons(x1,cons(x2,nil))),pair(s(s(z)),x0))"
     )) {
       runN[(Env,(Sym,LType))](3) { case Pair(g,Pair(x,tp)) =>
@@ -451,8 +451,8 @@ class TestSTLC extends MySuite with Base with Engine with STLC with STLC_Reverse
     }
 
     expectResult(List(
-      "pair(cons(x0,nil),pair(z,x0))", 
-      "pair(cons(x0,cons(x1,nil)),pair(s(z),x0))", 
+      "pair(cons(x0,nil),pair(z,x0))",
+      "pair(cons(x0,cons(x1,nil)),pair(s(z),x0))",
       "pair(cons(x0,cons(x1,cons(x2,nil))),pair(s(s(z)),x0))"
     )) {
       runN[(Env,(Sym,LType))](3) { case Pair(g,Pair(x,tp)) =>
@@ -462,8 +462,8 @@ class TestSTLC extends MySuite with Base with Engine with STLC with STLC_Reverse
     }
 
     expectResult(List(
-      "|-(cons(x0,cons(->(x0,x1),nil)),@(var(z),var(s(z))),x1)", 
-      "|-(cons(x0,cons(x1,cons(->(x1,x2),nil))),@(var(z),var(s(z))),x2)", 
+      "|-(cons(x0,cons(->(x0,x1),nil)),@(var(z),var(s(z))),x1)",
+      "|-(cons(x0,cons(x1,cons(->(x1,x2),nil))),@(var(z),var(s(z))),x2)",
       "|-(cons(x0,cons(x1,cons(x2,cons(->(x2,x3),nil)))),@(var(z),var(s(z))),x3)"
     )) {
       runN[Deriv](3) { d =>
@@ -515,19 +515,19 @@ class TestXX extends MySuite with ListBase with NatBase with Engine with MetaGra
   def lte_z = term[LF]("lte_z",Nil)
   def lte_s(x:Exp[LF]) = term[LF]("lte_s",List(x))
 
-  def clauses(head: Exp[Goal], body: Exp[List[Goal]]): Rel = 
+  def clauses(head: Exp[Goal], body: Exp[List[Goal]]): Rel =
     (head === lf(nat,typ)) && (body === nil) || // nat
     (head === lf(z,nat))   && (body === nil) ||
-    exists[LF] { x => 
+    exists[LF] { x =>
       (head === lf(s(x),nat)) && (body === cons(lf(x,nat),nil))
     } || // lte
-    exists[LF,LF] { (x,y) => 
+    exists[LF,LF] { (x,y) =>
       (head === lf(lte(x,y),typ)) && (body === cons(lf(x,nat),cons(lf(y,nat),nil)))
     } ||
-    exists[LF,LF] { (x,y) => 
+    exists[LF,LF] { (x,y) =>
       (head === lf(lte_z,lte(z,x))) && (body === nil)
     } ||
-    exists[LF,LF,LF] { (x,y,u) => 
+    exists[LF,LF,LF] { (x,y,u) =>
       (head === lf(lte_s(u),lte(s(x),s(y)))) && (body === cons(lf(u,lte(x,y)),nil))
     }
 
@@ -581,18 +581,18 @@ class TestProb extends MySuite with ListBase with NatBase with Engine {
   val theprob = DVar(1.0)
 
   def flip(p: Double, x: Exp[Boolean]): Rel =
-    { theprob := theprob() * p; x === true } || 
+    { theprob := theprob() * p; x === true } ||
     { theprob := theprob() * (1.0 - p); x === false }
 
   def flip2(p: Double)(a: => Rel)(b: => Rel): Rel =
-    { theprob := theprob() * p; a } || 
+    { theprob := theprob() * p; a } ||
     { theprob := theprob() * (1.0 - p); b }
 
 
   test("prob1") {
 
     expectResult(List(
-      "pair(true,0.2)", 
+      "pair(true,0.2)",
       "pair(false,0.8)"
     )) {
       runN[(Boolean,Double)](3) { case Pair(c,p) =>
@@ -631,7 +631,7 @@ trait TablingBase extends Base with Engine {
 
   def dprintln(x: Any) = () // println(x)
 
-}  
+}
 
 
 trait Tabling1 extends TablingBase {
@@ -651,17 +651,17 @@ trait Tabling1 extends TablingBase {
     override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
       val key = extractStr(goal)
       table.get(key) match {
-        case Some(goal1) if enabled => 
+        case Some(goal1) if enabled =>
           dprintln(key + " seen: " + extractStr(goal1))
           goal === goal1 // FIXME: not general enough!!!
           // TODO: invoke continuation with all stored answers
           // store continuation so that it can be called for future answers
           k()
-        case _ => 
+        case _ =>
           println(key)
           table(key) = goal
-          rec(() => a) { () => 
-            if (enabled) dprintln("answer for "+key+": " + extractStr(goal)) 
+          rec(() => a) { () =>
+            if (enabled) dprintln("answer for "+key+": " + extractStr(goal))
             // TODO: memoize answer (if exists ignore?)
             // invoke all stored continuations with new answer
             k()
@@ -738,20 +738,20 @@ trait Tabling2 extends TablingBase {
 
       val dvarsRange = (0 until dvarCount).toList
       def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
-      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) } 
+      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
       def invoke(cont: Cont, a: Answer) = {
         val (goal1, cstore1, cindex1, dvars1, ldvars0, ldvars1, k1) = cont
-        rec{ () => 
+        rec{ () =>
           // reset state to state at call
           cstore = cstore1; cindex = cindex1; dvars = dvars1
           // equate actual state with symbolic before state
           dvarsEqu(ldvars0)
           // load constraints from answer
-          a(goal1); 
+          a(goal1);
           // update actual state to symbolic after state
           dvarsSet(ldvars1)
-          Yes 
+          Yes
         }(k1)
       }
 
@@ -767,25 +767,25 @@ trait Tabling2 extends TablingBase {
       val cont = (goal,cstore,cindex,dvars,ldvars0,ldvars1,k) // save complete call state
       contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
-        case Some(answers) => 
+        case Some(answers) =>
           //dprintln("found " + key)
           for ((ansKey, ansConstr) <- answers.toList) // mutable! convert to list
             invoke(cont,ansConstr)
-        case _ => 
+        case _ =>
           dprintln(key)
           val ansMap = new scala.collection.mutable.HashMap[String, Answer]
           ansTable(key) = ansMap
-          rec { () => 
+          rec { () =>
             // evaluate goal with symbolic before state, to obtain rep of state after
             dvarsSet(ldvars0)
-            a 
-          } { () => 
+            a
+          } { () =>
             // constraint symbolic after state
             dvarsEqu(ldvars1)
             // disregard state again for memoization
-            val ansKey = extractStr(goal0) 
+            val ansKey = extractStr(goal0)
             ansMap.get(ansKey) match {
-              case None => 
+              case None =>
                 dprintln("answer for "+key+": " + ansKey)
                 val ansConstr = constrainAs(goal)
                 ansMap(ansKey) = ansConstr
@@ -795,7 +795,7 @@ trait Tabling2 extends TablingBase {
                   invoke(cont1,ansConstr)
                 }
               case Some(_) => // fail
-                //println("answer for "+key+": " + ansKey + " (duplicate)") 
+                //println("answer for "+key+": " + ansKey + " (duplicate)")
             }
           }
       }
@@ -846,7 +846,7 @@ class TestTabling1 extends TestTablingBase with Tabling1
 
 class TestTabling2 extends TestTablingBase with Tabling2 {
 
-  def edge(x:Exp[String],y:Exp[String]) = 
+  def edge(x:Exp[String],y:Exp[String]) =
     (x === "a") && (y === "b") ||
     (x === "b") && (y === "c") ||
     (x === "c") && (y === "a")
@@ -896,8 +896,8 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
 
   test("pathRT") {
     expectResult(List(
-      "pair(b,cons(path(a,b),nil))", 
-      "pair(c,cons(path(b,c),cons(path(a,c),nil)))", 
+      "pair(b,cons(path(a,b),nil))",
+      "pair(c,cons(path(b,c),cons(path(a,c),nil)))",
       "pair(a,cons(path(c,a),cons(path(b,a),cons(path(a,a),nil))))"
     )) {
       runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
@@ -929,11 +929,11 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
 
   val accum = DVar(nil: Exp[List[String]])
   def inc(n: Exp[Int]): Rel = {
-    (n === 0) || exists[Int] { n1 => 
+    (n === 0) || exists[Int] { n1 =>
       (n === succ(n1)) && {
         accum := cons("A", accum())
         inc(n1)
-      }  
+      }
     }
   }
 
@@ -949,12 +949,12 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
   val last = DVar(nil: Exp[List[String]])
   def inc2(n: Exp[Int]): Rel = {
     (n === 0) && (accum() === last()) ||
-    exists[Int] { n1 => 
+    exists[Int] { n1 =>
       (n === succ(n1)) && exists[List[String]] { tail =>
         accum() === cons("A", tail) && dlet(accum -> tail) {
           inc2(n1)
         }
-      }  
+      }
     }
   }
 
@@ -965,7 +965,7 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
     )) {
       runN[(List[String],List[String])](5) { case Pair(q1,q2) =>
         tabling(false)
-        dlet(last -> q1) { 
+        dlet(last -> q1) {
           dlet(accum -> q2) {
             inc2(3)
           }
@@ -989,10 +989,10 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
 
   test("stateRel2") {
     expectResult(List(
-      "pair(z,pair(x0,x0))", 
-      "pair(s(z),pair(x0,cons(A,x0)))", 
-      "pair(s(s(z)),pair(x0,cons(A,cons(A,x0))))", 
-      "pair(s(s(s(z))),pair(x0,cons(A,cons(A,cons(A,x0)))))", 
+      "pair(z,pair(x0,x0))",
+      "pair(s(z),pair(x0,cons(A,x0)))",
+      "pair(s(s(z)),pair(x0,cons(A,cons(A,x0))))",
+      "pair(s(s(s(z))),pair(x0,cons(A,cons(A,cons(A,x0)))))",
       "pair(s(s(s(s(z)))),pair(x0,cons(A,cons(A,cons(A,cons(A,x0))))))"
     )) {
       runN[(Int,(List[String],List[String]))](5) { case Pair(q1,Pair(q2,q3)) =>
@@ -1005,10 +1005,10 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
 
   test("stateRel3") {
     expectResult(List(
-      "pair(z,cons(A,cons(A,cons(A,cons(A,nil)))))", 
-      "pair(s(z),cons(A,cons(A,cons(A,nil))))", 
-      "pair(s(s(z)),cons(A,cons(A,nil)))", 
-      "pair(s(s(s(z))),cons(A,nil))", 
+      "pair(z,cons(A,cons(A,cons(A,cons(A,nil)))))",
+      "pair(s(z),cons(A,cons(A,cons(A,nil))))",
+      "pair(s(s(z)),cons(A,cons(A,nil)))",
+      "pair(s(s(s(z))),cons(A,nil))",
       "pair(s(s(s(s(z)))),nil)"
     )) {
       runN[(Int,List[String])](5) { case Pair(q1,q2) =>
@@ -1034,10 +1034,10 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
 
   test("stateRel2T") {
     expectResult(List(
-      "pair(z,pair(x0,x0))", 
-      "pair(s(z),pair(x0,cons(A,x0)))", 
-      "pair(s(s(z)),pair(x0,cons(A,cons(A,x0))))", 
-      "pair(s(s(s(z))),pair(x0,cons(A,cons(A,cons(A,x0)))))", 
+      "pair(z,pair(x0,x0))",
+      "pair(s(z),pair(x0,cons(A,x0)))",
+      "pair(s(s(z)),pair(x0,cons(A,cons(A,x0))))",
+      "pair(s(s(s(z))),pair(x0,cons(A,cons(A,cons(A,x0)))))",
       "pair(s(s(s(s(z)))),pair(x0,cons(A,cons(A,cons(A,cons(A,x0))))))"
     )) {
       runN[(Int,(List[String],List[String]))](5) { case Pair(q1,Pair(q2,q3)) =>
@@ -1050,10 +1050,10 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
 
   test("stateRel3T") {
     expectResult(List(
-      "pair(z,cons(A,cons(A,cons(A,cons(A,nil)))))", 
-      "pair(s(z),cons(A,cons(A,cons(A,nil))))", 
-      "pair(s(s(z)),cons(A,cons(A,nil)))", 
-      "pair(s(s(s(z))),cons(A,nil))", 
+      "pair(z,cons(A,cons(A,cons(A,cons(A,nil)))))",
+      "pair(s(z),cons(A,cons(A,cons(A,nil))))",
+      "pair(s(s(z)),cons(A,cons(A,nil)))",
+      "pair(s(s(s(z))),cons(A,nil))",
       "pair(s(s(s(s(z)))),nil)"
     )) {
       runN[(Int,List[String])](5) { case Pair(q1,q2) =>
@@ -1062,5 +1062,5 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
         inc(q1) && accum() === List("A","A","A","A")
       }
     }
-  }  
+  }
 }

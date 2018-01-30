@@ -44,12 +44,12 @@ trait NatBase extends InjectBase with Ordering {
   def succ(n: Exp[Int]): Exp[Int] = term("s",List(n))
   def zero: Exp[Int] = term("z",List())
 
-  def lessThan(a: Exp[Int], b: Exp[Int]): Rel = 
+  def lessThan(a: Exp[Int], b: Exp[Int]): Rel =
     exists[Int] { b1 => b === succ(b1) && { a === zero || exists[Int] { a1 =>
       (a === succ(a1)) && lessThan(a1,b1)
     }}}
 
-  def add(a: Exp[Int], b: Exp[Int], c: Exp[Int]): Rel = 
+  def add(a: Exp[Int], b: Exp[Int], c: Exp[Int]): Rel =
     (a === zero) && (b === c) ||
     exists[Int,Int] { (a1,c1) =>
       (a === succ(a1)) && (c === succ(c1)) && add(a1,b,c1)
@@ -154,7 +154,7 @@ trait TreeBase extends InjectBase with NatBase with Ordering {
   def empty: Exp[Tree[Nothing,Any]] = term("nil",List())
 
   def lookupAll[T,U](as: Exp[Tree[T,U]], k: Exp[T], v: Exp[U]): Rel =
-    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) => 
+    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) =>
       as === branch(l,k1,v1,r) && {
         (k === k1 && v === v1) ||
         lookupAll(l,k,v) || lookupAll(r,k,v)
@@ -162,18 +162,18 @@ trait TreeBase extends InjectBase with NatBase with Ordering {
     }
 
   def lookup[T:Ord,U](as: Exp[Tree[T,U]], k: Exp[T], v: Exp[U]): Rel =
-    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) => 
+    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) =>
       as === branch(l,k1,v1,r) && {
         (k === k1 && v === v1) ||
-        (k < k1 && lookup(l,k,v)) || 
+        (k < k1 && lookup(l,k,v)) ||
         (k1 < k && lookup(r,k,v))
       }
     }
 
   def lookupLess[T:Ord,U](as: Exp[Tree[T,U]], k: Exp[T], v: Exp[U]): Rel =
-    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) => 
+    exists[Tree[T,U],Tree[T,U],T,U] { (l,r,k1,v1) =>
       as === branch(l,k1,v1,r) && {
-        (lookupLess(l,k,v)) || 
+        (lookupLess(l,k,v)) ||
         (k1 < k && v === v1) ||
         (k1 < k && lookupLess(r,k,v))
       }
@@ -194,11 +194,11 @@ trait GraphBase extends InjectBase with NatBase {
 trait MetaGraphBase extends GraphBase with ListBase with Engine {
 
 /*
-(define (patho-clause head tail) 
+(define (patho-clause head tail)
   (fresh (x y)
-    (== head ‘(patho ,x ,y)) 
+    (== head ‘(patho ,x ,y))
     (conde
-      ((edgeo x y) (== tail ’())) 
+      ((edgeo x y) (== tail ’()))
       ((fresh (z)
         (edgeo x z)
         (== tail ‘((patho ,z ,y))))))))
@@ -209,7 +209,7 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
   def pathTerm[T](a: Exp[T], b: Exp[T]) = term[Goal]("path",List(a,b))
 
   def pathClause1[T](g: Graph[T])(head: Exp[Goal], body: Exp[List[Goal]]) = {
-    exists[T,T] { (a,b) => 
+    exists[T,T] { (a,b) =>
       (head === pathTerm(a,b)) && {
         (g.edge(a,b) && (body === nil)) ||
         exists[T] { z =>
@@ -237,10 +237,10 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
 (define (vanilla* clause)
   (define (solve* goals)
     (conde
-      ((== goals ’())) 
+      ((== goals ’()))
       ((fresh (g gs body)
-        (== (cons g gs) goals) 
-        (clause g body) 
+        (== (cons g gs) goals)
+        (clause g body)
         (solve* body)
         (solve* gs)))))
   solve*)
@@ -251,9 +251,9 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
 
 */
 
-  def vanilla(clause: Clause)(goals: Exp[List[Goal]]): Rel = 
-    goals === nil || 
-    exists[Goal,List[Goal],List[Goal]] { (g, gs, body) => 
+  def vanilla(clause: Clause)(goals: Exp[List[Goal]]): Rel =
+    goals === nil ||
+    exists[Goal,List[Goal],List[Goal]] { (g, gs, body) =>
       (goals === cons(g,gs)) &&
       clause(g,body) &&
       vanilla(clause)(body) &&
@@ -311,13 +311,13 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
   def rule[A,B](s: String)(f:(Exp[A], Exp[B]) => Rel) = {
     def goalTerm(a: Exp[A], b: Exp[B]) = term[Goal](s,List(a,b))
 
-    allclauses += s -> 
+    allclauses += s ->
       { (head: Exp[Goal], body: Exp[List[Goal]]) =>
-        exists[A,B] { (a,b) => 
+        exists[A,B] { (a,b) =>
           (head === goalTerm(a,b)) && reifyGoals(f(a,b))(body)
         }
       }
-  
+
     {(a: Exp[A], b: Exp[B]) =>
       val hole = moregoals()
       moregoals := fresh
@@ -325,8 +325,8 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
     }
   }
 
-  def path2[T](g: Graph[T]): (Exp[T],Exp[T])=> Rel = 
-    rule("path"/*+g.toString*/) { (a,b) => 
+  def path2[T](g: Graph[T]): (Exp[T],Exp[T])=> Rel =
+    rule("path"/*+g.toString*/) { (a,b) =>
       g.edge(a,b) ||
       exists[T] { z =>
         g.edge(a,z) && path2(g)(z,b)
@@ -340,7 +340,7 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
   }
 
   def reifyClause(goal: => Rel)(head: Exp[Goal], body: Exp[List[Goal]]): Rel = {
-    reifyGoals(goal)(cons(head,nil)) && { 
+    reifyGoals(goal)(cons(head,nil)) && {
       val s = extractStr(head)
       val key = s.substring(0,s.indexOf("(")) // a bit hacky, but hey ...
       println(key)
@@ -359,8 +359,8 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
     }
 
   def vanilla2(goals: Exp[List[Goal]]): Rel = {
-    goals === nil || 
-    exists[Goal,List[Goal],List[Goal]] { (g, gs, body) => 
+    goals === nil ||
+    exists[Goal,List[Goal],List[Goal]] { (g, gs, body) =>
       (goals === cons(g,gs)) &&
       allclausesRel(g,body) &&
       vanilla2(body) &&
@@ -379,7 +379,7 @@ trait ReifyUtilsBase extends Base with InjectBase with ListBase with Engine {
 trait ReifyUtilsDynVars extends ReifyUtilsBase with InjectBase with ListBase with Engine {
   val globalTrace = DVar(nil: Exp[List[List[String]]])
 
-  def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
+  def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel =
     { (a,b) =>
       globalTrace := cons(term(s,List(a,b)), globalTrace())
       f(a,b)
@@ -406,32 +406,32 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
     super.infix_&&(reset(a),b) // do not reset b
   }
 */
-  def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
-    { (a,b) => 
-      globalTrace = cons(term(s,List(a,b)),globalTrace()); 
+  def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel =
+    { (a,b) =>
+      globalTrace = cons(term(s,List(a,b)),globalTrace());
       f(a,b)
     }
 
   // inject non-std interpretation by transforming rules reified as Or and And
 /*
   var inrule: List[String] = Nil
-  def rule0[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel = 
-    { (a,b) => 
+  def rule0[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel =
+    { (a,b) =>
       val self = s + "(" + extractStr(a) + "," + extractStr(b) + ")"
       val local = self::inrule
-      //println("enter " + self + " at " + inrule.mkString(",")); 
+      //println("enter " + self + " at " + inrule.mkString(","));
 
       val localTrace = cons(term(s,List(a,b)),globalTrace())
 
       def vprintln(s: Any) = () // println(s)
 
-      try {         
+      try {
         def rec(n:Int)(r: Rel): Rel = r match {
-          case Or(a,b) => 
-            Or(() => { inrule = local; globalTrace = localTrace; vprintln("left  in "+n+self); rec(n+1)(a()) }, 
+          case Or(a,b) =>
+            Or(() => { inrule = local; globalTrace = localTrace; vprintln("left  in "+n+self); rec(n+1)(a()) },
                () => { inrule = local; globalTrace = localTrace; vprintln("right in "+n+self); rec(n+1)(b()) })
-          case And(a,b) => 
-            And(() => { inrule = local; globalTrace = localTrace; vprintln("fst in "+n+self); rec(n+1)(a()) }, 
+          case And(a,b) =>
+            And(() => { inrule = local; globalTrace = localTrace; vprintln("fst in "+n+self); rec(n+1)(a()) },
                 () => { inrule = local; globalTrace = localTrace; vprintln("snd in "+n+self); rec(n+1)(b()) }) // should not reset?
           case _ => r
         }
@@ -478,7 +478,7 @@ trait STLC extends Base with InjectBase with ListBase with Engine {
 
   def lookup(g: Exp[Env], x: Exp[Sym], tp: Exp[LType]): Rel
 
-  def typecheck(d: Exp[Deriv]): Rel = 
+  def typecheck(d: Exp[Deriv]): Rel =
     exists[Env,Sym,LType] { (G,x,t1) =>
       val a = G |- sym(x) :: t1
 
@@ -510,17 +510,17 @@ trait STLC_ReverseDeBruijn extends STLC {
     g1 === cons(tp,g) && freein(g,x)
 
 
-  def lookup(g: Exp[Env], x: Exp[Sym], tp: Exp[LType]): Rel = 
-    exists[LType,Env] { (hd,tl) => 
+  def lookup(g: Exp[Env], x: Exp[Sym], tp: Exp[LType]): Rel =
+    exists[LType,Env] { (hd,tl) =>
       g === cons(hd,tl) && {
-        freein(tl,x) && (hd === tp) || 
+        freein(tl,x) && (hd === tp) ||
         lookup(tl,x,tp)
       }
     }
 
-  def freein(g: Exp[Env], x: Exp[Sym]): Rel = 
+  def freein(g: Exp[Env], x: Exp[Sym]): Rel =
     g === nil && x === zero ||
-    exists[Sym,Env] { (x1,tl) => 
+    exists[Sym,Env] { (x1,tl) =>
       g === cons(fresh[LType],tl) && x === succ(x1) && freein(tl,x1)
     }
 }
@@ -535,7 +535,7 @@ trait STLC_Nat extends STLC {
 
   def cnat(x: Exp[Int]) = term[LTerm]("nat",List(x))
 
-  override def typecheck(d: Exp[Deriv]): Rel = 
+  override def typecheck(d: Exp[Deriv]): Rel =
     exists[Env,Int] { (G,x) =>
       val a = G |- cnat(x) :: tnat
 

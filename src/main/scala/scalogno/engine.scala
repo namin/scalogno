@@ -129,7 +129,7 @@ trait Base {
   }
 
   def xinfix_===[T](a: => Exp[T], b: => Exp[T]): Rel = {
-    val c = IsEqual(a,b)    
+    val c = IsEqual(a,b)
     //reflectCmd(Reg(c)) delayed mode may still want eager constraints
     register(c)
     TSX(Yes)
@@ -153,7 +153,7 @@ trait Base {
     val e = fresh[T]
     val c = IsTerm(e.id, key, args)
     //reflectCmd(Reg(c)) delayed mode may still want eager constraints
-    register(c)    
+    register(c)
     e
   }
 

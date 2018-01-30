@@ -262,6 +262,29 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
 
   type Clause = (Exp[Goal], Exp[List[Goal]]) => Rel
 
+/*
+(define (tracer* clause)
+  (define (solve* goals trace-in trace-out)
+    (conde
+      ((== goals '())
+       (== trace-in trace-out))
+      ((fresh (g gs body trace-out-body)
+         (== (cons g gs) goals)
+         (clause g body)
+         (solve* body (cons g trace-in) trace-out-body)
+         (solve* gs trace-out-body trace-out)))))
+  (lambda (goal t)
+    (solve* (list goal) '() t)))
+*/
+  def tracer(clause: Clause)(in: Exp[List[Goal]], out: Exp[List[Goal]])(goals: Exp[List[Goal]]): Rel =
+    ((goals === nil) && (in === out)) ||
+    exists[Goal,List[Goal],List[Goal],List[Goal]] { (g, gs, body, out_body) =>
+      (goals === cons(g,gs)) &&
+      clause(g,body) &&
+      tracer(clause)(cons(g,in),out_body)(body) &&
+      tracer(clause)(out_body,out)(gs)
+    }
+
   def existsC[T,U](f: (Exp[T],Exp[U]) => Clause): Clause = {
     f(fresh[T],fresh[U])
   }

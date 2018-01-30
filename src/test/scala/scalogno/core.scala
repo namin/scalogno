@@ -407,6 +407,17 @@ class TestMetaGraphs extends MySuite with Base with Engine with MetaGraphBase {
       }
     }
 
+    expectResult(List(
+        "pair(b,cons(path(a,b),nil))",
+        "pair(c,cons(path(b,c),cons(path(a,c),nil)))",
+        "pair(a,cons(path(c,a),cons(path(b,a),cons(path(a,a),nil))))",
+        "pair(b,cons(path(a,b),cons(path(c,b),cons(path(b,b),cons(path(a,b),nil)))))"
+    )) {
+      runN[(List[Any],List[Goal])](4) { case Pair(q,t) =>
+        tracer(pathClause1(g))(nil,t)(cons(pathTerm("a",q),nil))
+      }
+    }
+
   }
 
   test("graph interp2") {

@@ -393,54 +393,11 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
   def globalTrace = () => globalTrace0
   def globalTrace_=(x:Exp[List[List[String]]]) = globalTrace0 = x
 
-  // inject non-std interpretation by overriding || and &&
-/*
-  override def infix_||(a: => Rel, b: => Rel): Rel = {
-    val localTrace = globalTrace()
-    def reset(x: => Rel) = { globalTrace = localTrace; x }
-    super.infix_||(reset(a),reset(b))
-  }
-  override def infix_&&(a: => Rel, b: => Rel): Rel = {
-    val localTrace = globalTrace()
-    def reset(x: => Rel) = { globalTrace = localTrace; x }
-    super.infix_&&(reset(a),b) // do not reset b
-  }
-*/
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel =
     { (a,b) =>
       globalTrace = cons(term(s,List(a,b)),globalTrace());
       f(a,b)
     }
-
-  // inject non-std interpretation by transforming rules reified as Or and And
-/*
-  var inrule: List[String] = Nil
-  def rule0[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel =
-    { (a,b) =>
-      val self = s + "(" + extractStr(a) + "," + extractStr(b) + ")"
-      val local = self::inrule
-      //println("enter " + self + " at " + inrule.mkString(","));
-
-      val localTrace = cons(term(s,List(a,b)),globalTrace())
-
-      def vprintln(s: Any) = () // println(s)
-
-      try {
-        def rec(n:Int)(r: Rel): Rel = r match {
-          case Or(a,b) =>
-            Or(() => { inrule = local; globalTrace = localTrace; vprintln("left  in "+n+self); rec(n+1)(a()) },
-               () => { inrule = local; globalTrace = localTrace; vprintln("right in "+n+self); rec(n+1)(b()) })
-          case And(a,b) =>
-            And(() => { inrule = local; globalTrace = localTrace; vprintln("fst in "+n+self); rec(n+1)(a()) },
-                () => { inrule = local; globalTrace = localTrace; vprintln("snd in "+n+self); rec(n+1)(b()) }) // should not reset?
-          case _ => r
-        }
-        rec(0)(f(a,b))
-      } finally {
-        inrule = local.tail
-      }
-    }
-*/
 }
 
 

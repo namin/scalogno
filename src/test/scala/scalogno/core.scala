@@ -334,6 +334,19 @@ class TestMetaGraphs extends MySuite with Base with Engine with MetaGraphBase {
   test("meta graph") {
 
     expectResult(List(
+      "cons(to prove,cons(path(x0,x1),cons(prove,cons(cons(edge(x0,x1),nil),nil))))",
+      "cons(to prove,cons(path(x0,x1),cons(prove,cons(cons(edge(x0,x2),cons(path(x2,x1),nil)),nil))))"
+    )) {
+      run[List[Any]] { q =>
+        exists[Goal,List[Goal]] { (head,body) =>
+          exists[String,String] { (a,b) => pathTerm(a,b) === head } &&
+          q === cons("to prove", cons(head, cons("prove", cons(body, nil)))) &&
+          pathFullClause1(g)(head,body)
+        }
+      }
+    }
+
+    expectResult(List(
       "cons(to prove,cons(path(a,b),cons(prove,cons(nil,nil))))", 
       "cons(to prove,cons(path(b,c),cons(prove,cons(nil,nil))))", 
       "cons(to prove,cons(path(c,a),cons(prove,cons(nil,nil))))", 

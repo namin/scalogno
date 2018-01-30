@@ -219,6 +219,20 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
     }
   }
 
+  def edgeTerm[T](a: Exp[T], b: Exp[T]) = term[Goal]("edge",List(a,b))
+
+  def pathFullClause1[T](g: Graph[T])(head: Exp[Goal], body: Exp[List[Goal]]) = {
+    exists[T,T] { (a,b) =>
+      ((head === pathTerm(a,b)) && (
+        (body === cons(edgeTerm(a,b),nil)) ||
+          exists[T] { z =>
+            body === cons(edgeTerm(a,z), cons(pathTerm(z,b),nil))
+          }
+      )) ||
+      ((head === edgeTerm(a,b)) && g.edge(a,b))
+    }
+  }
+
 /*
 (define (vanilla* clause)
   (define (solve* goals)

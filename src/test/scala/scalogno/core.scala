@@ -804,6 +804,79 @@ trait Tabling2 extends TablingBase {
 }
 
 
+trait TestTablingAppBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
+  def exp(s0: Exp[List[String]], s: Exp[List[String]]): Rel = memo(term("exp", List(s0,s))) {
+    { val s1,s2 = fresh[List[String]]
+      exp(s0,s1) && (s1 === cons("+",s2)) && trm(s2,s) } ||
+    trm(s0, s) }
+  def trm(s0: Exp[List[String]], s: Exp[List[String]]): Rel = memo(term("trm", List(s0,s))) {
+    { val s1,s2 = fresh[List[String]]
+      trm(s0,s1) && (s1 === cons("*",s2)) && fct(s2,s) } ||
+    fct(s0, s) }
+  def fct(s0: Exp[List[String]], s: Exp[List[String]]) = memo(term("fct", List(s0,s))) {
+    { val s1,s2 = fresh[List[String]]
+      s0 === cons("(", s1) && exp(s1, s2) && s2 === cons(")", s) } ||
+    { val n = fresh[String]
+      s0 === cons(n, s) && dgt(n) }
+  }
+  def dgt(n: Exp[String]) = memo(term("dgt",List(n))) {
+    n === "0" || n === "1" || n === "2" || n === "3" || n === "4" ||
+    n === "5" || n === "6" || n === "7" || n === "8" || n === "9"
+  }
+
+  def tokenize(s: String): List[String] = s.toList.map(_.toString)
+
+  test("exp1") {
+    expectResult(List()) {
+      runN[List[String]](3) { q =>
+        tabling(true)
+        exp(tokenize("3+4*"),nil)
+      }
+    }
+  }
+
+  test("exp2") {
+    expectResult(List("x0")) {
+      runN[List[String]](3) { q =>
+        tabling(true)
+        exp(tokenize("3+4*5"),nil)
+      }
+    }
+  }
+
+  test("exp3") {
+    expectResult(List("x0")) {
+      runN[List[String]](3) { q =>
+        tabling(true)
+        exp(tokenize("(3+4)*7"),nil)
+      }
+    }
+  }
+
+  def list8(q: Exp[List[String]]): Rel = memo(term("list8", List(q))) {
+      val x1 = fresh[String]
+      val x2 = fresh[String]
+      val x3 = fresh[String]
+      val x4 = fresh[String]
+      val x5 = fresh[String]
+      val x6 = fresh[String]
+      val x7 = fresh[String]
+      val x8 = fresh[String]
+      q === cons(x1,cons(x2,cons(x3,cons(x4,cons(x5,cons(x6,cons(x7,cons(x8, nil))))))))
+  }
+
+  test("exp4") {
+    expectResult(List()) {
+      runN[List[String]](3) { q =>
+        tabling(true)
+        list8(q) && exp(q,nil)
+      }
+    }
+  }
+}
+
+class TestTablingApp2 extends TestTablingAppBase with Tabling2 // Tabling1 does not work
+
 trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
 
   def fib(x:Exp[Int], y:Exp[Int]): Rel = memo(term("fib",List(x,y))) {
@@ -839,7 +912,6 @@ trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBas
     }
     println("done")
   }
-
 }
 
 class TestTabling1 extends TestTablingBase with Tabling1

@@ -193,7 +193,6 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
   }
 }
 
-/*
 class TestTrees extends MySuite with Base with Engine with NatBase with ListBase with TreeBase {
 
   test("tree") {
@@ -625,7 +624,7 @@ class TestProb extends MySuite with ListBase with NatBase with Engine {
 }
 
 
-
+/*
 trait TablingBase extends Base with Engine {
 
   def memo(goal: Exp[Any])(a: => Rel): Rel

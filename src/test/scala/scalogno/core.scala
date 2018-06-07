@@ -623,7 +623,6 @@ class TestProb extends MySuite with ListBase with NatBase with Engine {
 
 }
 
-/*
 trait TablingBase extends Base with Engine {
 
   def memo(goal: Exp[Any])(a: => Rel): Rel
@@ -710,10 +709,10 @@ trait Tabling1 extends TablingBase {
 trait Tabling2 extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  type Cont2 = (Exp[Any], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
+  type Call = (Exp[Any], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], Cont)
 
   val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
-  val contTable = new scala.collection.mutable.HashMap[String, List[Cont]]
+  val contTable = new scala.collection.mutable.HashMap[String, List[Call]]
 
   var enabled = true
 
@@ -773,7 +772,7 @@ trait Tabling2 extends TablingBase {
       def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
       def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
-      def invoke(cont: Cont, a: Answer) = {
+      def invoke(cont: Call, a: Answer) = {
         val (goal1, dvars1, ldvars0, ldvars1, k1) = cont
         rec{ () =>
           // reset state to state at call
@@ -797,7 +796,7 @@ trait Tabling2 extends TablingBase {
       // but disregard state for memoization (compute key for goal0)
       val key = extractStr(goal0)
 
-      val cont = (goal,dvars,ldvars0,ldvars1,k) // save complete call state
+      val cont: Call = (goal,dvars,ldvars0,ldvars1,k) // save complete call state
       contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
         case Some(answers) =>
@@ -907,7 +906,7 @@ trait TestTablingAppBase extends MySuite with ListBase with NatBase with Tabling
   }
 }
 
-class TestTablingApp extends TestTablingAppBase with TablingImpl
+class TestTablingApp extends TestTablingAppBase with Tabling2
 
 trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
 
@@ -946,7 +945,7 @@ trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBas
   }
 }
 
-class TestTabling extends TestTablingBase with TablingImpl {
+class TestTabling extends TestTablingBase with Tabling2 {
 
   def edge(x:Exp[String],y:Exp[String]) =
     (x === "a") && (y === "b") ||
@@ -1027,7 +1026,7 @@ class TestTabling extends TestTablingBase with TablingImpl {
 }
 
 
-class TestTablingMore extends MySuite with ListBase with NatBase with TablingImpl with Engine {
+class TestTablingMore extends MySuite with ListBase with NatBase with Tabling2 with Engine {
 
   val accum = DVar(nil: Exp[List[String]])
   def inc(n: Exp[Int]): Rel = {
@@ -1166,4 +1165,4 @@ class TestTablingMore extends MySuite with ListBase with NatBase with TablingImp
     }
   }
 }
-*/
+

@@ -40,8 +40,8 @@ def freshId = {
   }
 
 // dynamically scoped variables
-var dvars: Map[Int, Any] = Map.empty
-  case class DVar[T](val id: Int, val default: T) extends (() => T) {
+var dvars: scala.collection.immutable.Map[Int, Any] = Map.empty
+case class DVar[T](val id: Int, val default: T) extends (() => T) {
   dvar_set(id,default)
   def apply()  = dvar_get[T](id)
   def :=(v: T) = dvar_set[T](id,v)
@@ -182,7 +182,7 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
     val idx = cstore() groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
     val stack = new scala.collection.mutable.BitSet(varCount)
     val stack2 = new scala.collection.mutable.BitSet(varCount)
-    val seenVars= new scala.collection.mutable.HashMap[Int,Int]
+    val seenVars = new scala.collection.mutable.HashMap[Int,Int]
     def canon(x: Exp[Any]): String = {
       val id = (Set(x.id) ++ (cstore() collect {
         case IsEqual(`x`,y) if y.id < x.id => y.id

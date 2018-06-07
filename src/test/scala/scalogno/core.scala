@@ -636,8 +636,81 @@ trait TablingBase extends Base with Engine {
 
 
 trait TablingImpl extends TablingBase {
+import scala.collection._
+case class Call(key: String)
+case class Answer(key: String)
+def key(name: String, args: Exp[Any]*): String =
+  name+"("+args.map(extractStr).mkString(",")+")"
+def makeCall(name: String, args: Exp[Any]*): Call =
+  Call(key(name, args: _*))
+def makeAnswer(name: String, args: Exp[Any]*): Answer =
+  Answer(key(name, args: _*))
+val callTable = new mutable.HashMap[String, (mutable.HashSet[Call], mutable.HashSet[Answer])]
+// tabling combinator
+def memo[A,B](name: String)(f: (Exp[A], Exp[B]) => Rel)(a: Exp[A], b: Exp[B]): Rel = new Rel {
+  override def exec(call: Exec)(k: Cont): Unit = {
+    def resume(cont: Call, ans: Answer) = ???
+    val cont = makeCall(name, a, b)
+    callTable.get(cont.key) match {
+      case Some((conts, answers)) =>                         // call key found:
+        conts += cont                                        //   save continuation for later
+        for (ans <- answers.toList) resume(cont, ans)        //   continue with stored answers
+      case None =>                                           // call key not found:
+        val answers = new mutable.HashSet[Answer]            //   add table entry
+        val conts   = new mutable.HashSet[Call]  
+        callTable(cont.key) = (conts,answers)  
+        conts += cont                                        //   store continuation
+        call { () => f(a,b) } { () =>                        //   execute rule body
+          val ans = makeAnswer(name, a, b)
+          if (!answers.contains(ans)) {                      
+            answers += ans                                   //   record each new answer and
+            for (cont1 <- conts.toList) resume(cont1, ans)   //   resume stored continuations
+} } }   } }
+}
+
+trait Tabling1 extends TablingBase {
+
+  type Entry = Exp[Any]
+
+  var table = new scala.collection.mutable.HashMap[String, Entry]
+
+  var enabled = true
+
+  def tabling(on: Boolean): Unit = {
+    table.clear
+    enabled = on
+  }
+
+  def memo(goal: Exp[Any])(a: => Rel): Rel = new Rel {
+    override def exec(rec: Exec)(k: Cont): Unit = {
+      val key = extractStr(goal)
+      table.get(key) match {
+        case Some(goal1) if enabled =>
+          dprintln(key + " seen: " + extractStr(goal1))
+          goal === goal1 // FIXME: not general enough!!!
+          // TODO: invoke continuation with all stored answers
+          // store continuation so that it can be called for future answers
+          k()
+        case _ =>
+          println(key)
+          table(key) = goal
+          rec(() => a) { () =>
+            if (enabled) dprintln("answer for "+key+": " + extractStr(goal))
+            // TODO: memoize answer (if exists ignore?)
+            // invoke all stored continuations with new answer
+            k()
+          }
+      }
+    }
+  }
+
+}
+
+
+trait Tabling2 extends TablingBase {
+
   type Answer = (Exp[Any] => Unit)
-  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
+  type Cont2 = (Exp[Any], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
 
   val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
   val contTable = new scala.collection.mutable.HashMap[String, List[Cont]]
@@ -652,9 +725,8 @@ trait TablingImpl extends TablingBase {
 
 
   def constrainAs(g1: Exp[Any]): Answer = { // TODO!
-    val lcstore = cstore
-    val lcindex = cindex
-    val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+    val lcstore = cstore()
+    val lidx = cstore() groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
 
     val k1 = extractStr(g1)
     (g2: Exp[Any]) => {
@@ -693,8 +765,8 @@ trait TablingImpl extends TablingBase {
     }
   }
 
-  def memo(goal0: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
-    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+  def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
+    override def exec(rec: Exec)(k: Cont): Unit = {
       if (!enabled) return rec(() => a)(k)
 
       val dvarsRange = (0 until dvarCount).toList
@@ -702,10 +774,10 @@ trait TablingImpl extends TablingBase {
       def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
       def invoke(cont: Cont, a: Answer) = {
-        val (goal1, cstore1, cindex1, dvars1, ldvars0, ldvars1, k1) = cont
+        val (goal1, dvars1, ldvars0, ldvars1, k1) = cont
         rec{ () =>
           // reset state to state at call
-          cstore = cstore1; cindex = cindex1; dvars = dvars1
+          dvars = dvars1
           // equate actual state with symbolic before state
           dvarsEqu(ldvars0)
           // load constraints from answer
@@ -725,7 +797,7 @@ trait TablingImpl extends TablingBase {
       // but disregard state for memoization (compute key for goal0)
       val key = extractStr(goal0)
 
-      val cont = (goal,cstore,cindex,dvars,ldvars0,ldvars1,k) // save complete call state
+      val cont = (goal,dvars,ldvars0,ldvars1,k) // save complete call state
       contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
         case Some(answers) =>

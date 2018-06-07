@@ -624,7 +624,6 @@ class TestProb extends MySuite with ListBase with NatBase with Engine {
 }
 
 
-/*
 trait TablingBase extends Base with Engine {
 
   def memo(goal: Exp[Any])(a: => Rel): Rel
@@ -636,7 +635,7 @@ trait TablingBase extends Base with Engine {
 }
 
 
-trait Tabling1 extends TablingBase {
+trait TablingImpl extends TablingBase {
 
   type Entry = Exp[Any]
 
@@ -673,137 +672,6 @@ trait Tabling1 extends TablingBase {
   }
 
 }
-
-/*
-trait Tabling2 extends TablingBase {
-
-  type Answer = (Exp[Any] => Unit)
-  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
-
-  val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
-  val contTable = new scala.collection.mutable.HashMap[String, List[Cont]]
-
-  var enabled = true
-
-  def tabling(on: Boolean): Unit = {
-    ansTable.clear
-    contTable.clear
-    enabled = on
-  }
-
-
-  def constrainAs(g1: Exp[Any]): Answer = { // TODO!
-    val lcstore = cstore()
-    val lidx = cstore() groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
-
-    val k1 = extractStr(g1)
-    (g2: Exp[Any]) => {
-
-      val stack = new scala.collection.mutable.BitSet(varCount)
-      val seenVars= new scala.collection.mutable.HashMap[Int,Int]
-      def copyVar(x: Exp[Any]): Exp[Any] = {
-        val id = (Set(x.id) ++ (lcstore collect {
-          case IsEqual(`x`,y) if y.id < x.id => y.id
-          case IsEqual(y,`x`) if y.id < x.id => y.id
-        })).min
-        val mid = seenVars.getOrElseUpdate(id,seenVars.size)
-        Exp(mid)
-      }
-      def copyTerm(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
-        case Some(IsTerm(id, key, args)) =>
-          assert(id == x.id)
-          assert(!stack.contains(id), "cyclic terms not handled")
-          try {
-            stack += id
-            term(key, args map copyTerm)
-          } finally {
-            stack -= id
-          }
-        case _ =>
-          copyVar(x)
-      }
-
-      val g1x = copyTerm(g1)
-      val k1x = extractStr(g1x)
-      //assert(k1x == k1, s"expect $k1 but got $k1x") disabled for dvar init: default might not be written yet
-      val k2 = extractStr(g2)
-      dprintln(s"$k2 --> $k1")
-
-      g1x === g2
-    }
-  }
-
-  def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
-    override def run(rec: Exec)(k: Cont): Unit = {
-      if (!enabled) return rec(() => a)(k)
-
-      val dvarsRange = (0 until dvarCount).toList
-      def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
-      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
-
-      def invoke(cont: Cont, a: Answer) = {
-        val (goal1, cstore1, dvars1, ldvars0, ldvars1, k1) = cont
-        rec{ () =>
-          // reset state to state at call
-          cstore := cstore1; dvars = dvars1
-          // equate actual state with symbolic before state
-          dvarsEqu(ldvars0)
-          // load constraints from answer
-          a(goal1);
-          // update actual state to symbolic after state
-          dvarsSet(ldvars1)
-          Yes
-        }(k1)
-      }
-
-      val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
-      val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
-
-      // extend goal with symbolic state before and after
-      val goal = term("goal",List(goal0, term("state0", ldvars0), term("state1", ldvars1)))
-
-      // but disregard state for memoization (compute key for goal0)
-      val key = extractStr(goal0)
-
-      val cont = (goal,cstore(),dvars,ldvars0,ldvars1,k) // save complete call state
-      contTable(key) = cont::contTable.getOrElse(key,Nil)
-      ansTable.get(key) match {
-        case Some(answers) =>
-          //dprintln("found " + key)
-          for ((ansKey, ansConstr) <- answers.toList) // mutable! convert to list
-            invoke(cont,ansConstr)
-        case _ =>
-          dprintln(key)
-          val ansMap = new scala.collection.mutable.HashMap[String, Answer]
-          ansTable(key) = ansMap
-          rec { () =>
-            // evaluate goal with symbolic before state, to obtain rep of state after
-            dvarsSet(ldvars0)
-            a
-          } { () =>
-            // constraint symbolic after state
-            dvarsEqu(ldvars1)
-            // disregard state again for memoization
-            val ansKey = extractStr(goal0)
-            ansMap.get(ansKey) match {
-              case None =>
-                dprintln("answer for "+key+": " + ansKey)
-                val ansConstr = constrainAs(goal)
-                ansMap(ansKey) = ansConstr
-                var i = 0
-                for (cont1 <- contTable(key).reverse) {
-                  //println("call cont "+i+" with "+key+" -> "+ansKey); i+=1
-                  invoke(cont1,ansConstr)
-                }
-              case Some(_) => // fail
-                //println("answer for "+key+": " + ansKey + " (duplicate)")
-            }
-          }
-      }
-    }
-  }
-}
-*/
 
 trait TestTablingAppBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
   def exp(s0: Exp[List[String]], s: Exp[List[String]]): Rel = memo(term("exp", List(s0,s))) {
@@ -876,7 +744,7 @@ trait TestTablingAppBase extends MySuite with ListBase with NatBase with Tabling
   }
 }
 
-// class TestTablingApp2 extends TestTablingAppBase with Tabling2 // Tabling1 does not work
+class TestTablingApp extends TestTablingAppBase with TablingImpl
 
 trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
 
@@ -915,10 +783,7 @@ trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBas
   }
 }
 
-class TestTabling1 extends TestTablingBase with Tabling1
-
-/*
-class TestTabling2 extends TestTablingBase with Tabling2 {
+class TestTabling extends TestTablingBase with TablingImpl {
 
   def edge(x:Exp[String],y:Exp[String]) =
     (x === "a") && (y === "b") ||
@@ -999,7 +864,7 @@ class TestTabling2 extends TestTablingBase with Tabling2 {
 }
 
 
-class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with Engine {
+class TestTablingMore extends MySuite with ListBase with NatBase with TablingImpl with Engine {
 
   val accum = DVar(nil: Exp[List[String]])
   def inc(n: Exp[Int]): Rel = {
@@ -1012,7 +877,7 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
   }
 
   def dlet[T](p: (DVar[T],T))(body: =>Rel): Rel = new Rel {
-    override def run(rec: Exec)(k: Cont): Unit = {
+    override def exec(rec: Exec)(k: Cont): Unit = {
       val (v,x) = p
       val old = v()
       v := x
@@ -1138,5 +1003,3 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
     }
   }
 }
-*/
-*/

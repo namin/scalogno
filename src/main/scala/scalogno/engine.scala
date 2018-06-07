@@ -46,7 +46,7 @@ case class DVar[T](val id: Int, val default: T) extends (() => T) {
   def apply()  = dvar_get[T](id)
   def :=(v: T) = dvar_set[T](id,v)
 }
-var dvarCount = 0
+var dvarCount = 1
 def DVar[T](v: T): DVar[T] = {
   val id = dvarCount
   dvarCount += 1
@@ -95,7 +95,7 @@ case class IsTerm(id: Int, key: String, args: List[Exp[Any]])
 case class IsEqual(x: Exp[Any], y: Exp[Any]) 
   extends Constraint
 
-val cstore: DVar[Set[Constraint]] = DVar(Set.empty)
+var cstore: scala.collection.immutable.Set[Constraint] = scala.collection.immutable.Set.empty
 def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
   def prop(c1: Constraint, c2: Constraint)(fail: () => Nothing): List[Constraint] = (c1,c2) match {
     case (IsEqual(a1,b1), IsEqual(a2,b2)) if a1 == a2 || a1 == b2 || b1 == a2 || b1 == b2 =>
@@ -121,14 +121,14 @@ def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
   val fail = () => throw Backtrack
 
   val cn = cs flatMap { c2 => prop(c, c2)(fail) }
-  dvar_upd[Set[Constraint]](cstore.id)(x => x + c)
+  cstore += c
   cn foreach register
   false
 }
 
 def register(c: Constraint): Unit = {
-  if (cstore().contains(c)) return
-  if (conflict(cstore(),c)) throw Backtrack
+  if (cstore.contains(c)) return
+  if (conflict(cstore,c)) throw Backtrack
 }
 }
 
@@ -136,12 +136,14 @@ trait Engine extends Base {
 // execution (depth-first)
 def run[T](f: Exp[T] => Rel): Seq[String] = {
   def call(e: () => Rel)(k: Cont): Unit = {
+    val cstore1 = cstore
     val dvars1 = dvars
     try {
       e().exec(call)(k)
     } catch {
       case Backtrack => // OK
     } finally {
+      cstore = cstore1
       dvars = dvars1
     }
   }
@@ -155,12 +157,14 @@ def run[T](f: Exp[T] => Rel): Seq[String] = {
 
 def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
   def call(e: () => Rel)(k: Cont): Unit = {
+    val cstore1 = cstore
     val dvars1 = dvars
     try {
       e().exec(call)(k)
     } catch {
       case Backtrack => // OK
     } finally {
+      cstore = cstore1
       dvars = dvars1
     }
   }
@@ -179,12 +183,12 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
   // def extractStr(x: Exp[Any]): String
 
   def dump(out: java.io.PrintWriter)(x: Exp[Any]): Unit = {
-    val idx = cstore() groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+    val idx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
     val stack = new scala.collection.mutable.BitSet(varCount)
     val stack2 = new scala.collection.mutable.BitSet(varCount)
     val seenVars = new scala.collection.mutable.HashMap[Int,Int]
     def canon(x: Exp[Any]): String = {
-      val id = (Set(x.id) ++ (cstore() collect {
+      val id = (Set(x.id) ++ (cstore collect {
         case IsEqual(`x`,y) if y.id < x.id => y.id
         case IsEqual(y,`x`) if y.id < x.id => y.id
       })).min

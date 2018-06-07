@@ -266,7 +266,6 @@ class TestTrees extends MySuite with Base with Engine with NatBase with ListBase
 }
 
 
-
 trait TestGraphsBase extends MySuite with Base with Engine with NatBase with ListBase with GraphBase with ReifyUtilsBase {
 
   test("graph") {
@@ -709,7 +708,7 @@ trait Tabling1 extends TablingBase {
 trait Tabling2 extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  type Call = (Exp[Any], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], Cont)
+  type Call = (Exp[Any], Set[Constraint], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], Cont)
 
   val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
   val contTable = new scala.collection.mutable.HashMap[String, List[Call]]
@@ -724,8 +723,8 @@ trait Tabling2 extends TablingBase {
 
 
   def constrainAs(g1: Exp[Any]): Answer = { // TODO!
-    val lcstore = cstore()
-    val lidx = cstore() groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+    val lcstore = cstore
+    val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
 
     val k1 = extractStr(g1)
     (g2: Exp[Any]) => {
@@ -773,10 +772,10 @@ trait Tabling2 extends TablingBase {
       def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
       def invoke(cont: Call, a: Answer) = {
-        val (goal1, dvars1, ldvars0, ldvars1, k1) = cont
+        val (goal1, cstore1, dvars1, ldvars0, ldvars1, k1) = cont
         rec{ () =>
           // reset state to state at call
-          dvars = dvars1
+          cstore = cstore1; dvars = dvars1
           // equate actual state with symbolic before state
           dvarsEqu(ldvars0)
           // load constraints from answer
@@ -796,7 +795,7 @@ trait Tabling2 extends TablingBase {
       // but disregard state for memoization (compute key for goal0)
       val key = extractStr(goal0)
 
-      val cont: Call = (goal,dvars,ldvars0,ldvars1,k) // save complete call state
+      val cont: Call = (goal,cstore,dvars,ldvars0,ldvars1,k) // save complete call state
       contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
         case Some(answers) =>
@@ -1165,4 +1164,3 @@ class TestTablingMore extends MySuite with ListBase with NatBase with Tabling2 w
     }
   }
 }
-

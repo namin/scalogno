@@ -19,7 +19,7 @@ class TestNats extends MySuite with Base with Engine with NatBase with ListBase 
   }
 
 }
-
+/*
 class TestLists extends MySuite with Base with Engine with NatBase with ListBase {
 
   test("append") {
@@ -1136,4 +1136,5 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
     }
   }
 }
+*/
 */

@@ -90,13 +90,38 @@ case class IsEqual(x: Exp[Any], y: Exp[Any])
 
 val cstore = new DVar[Set[Constraint]](Set.empty)
 def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
-  false // TODO
+  def prop(c1: Constraint, c2: Constraint)(fail: () => Nothing): List[Constraint] = (c1,c2) match {
+    case (IsEqual(a1,b1), IsEqual(a2,b2)) if a1 == a2 || a1 == b2 || b1 == a2 || b1 == b2 =>
+      List(IsEqual(a1,a2),IsEqual(a1,b2),IsEqual(b1,a2),IsEqual(b1,b2))
+
+    case (IsEqual(Exp(a),Exp(b)), IsTerm(a1, key, args)) if a == a1 =>
+      List(IsTerm(b, key, args))
+    case (IsTerm(a1, key, args), IsEqual(Exp(a),Exp(b))) if a == a1 =>
+      List(IsTerm(b, key, args))
+    case (IsEqual(Exp(a),Exp(b)), IsTerm(a1, key, args)) if a == a1 =>
+      List(IsTerm(b, key, args))
+    case (IsTerm(b1, key, args), IsEqual(Exp(a),Exp(b))) if b == b1 =>
+      List(IsTerm(a, key, args))
+    case (IsEqual(Exp(a),Exp(b)), IsTerm(b1, key, args)) if b == b1 =>
+      List(IsTerm(a, key, args))
+
+    case (IsTerm(a1, key1, args1), IsTerm(a2, key2, args2)) if a1 == a2 =>
+      if (key1 != key2 || args1.length != args2.length) fail()
+      (args1,args2).zipped map (IsEqual(_,_))
+    case _ => Nil
+  }
+
+  val fail = () => throw Backtrack
+
+  val cn = cs flatMap { c2 => prop(c, c2)(fail) }
+  cstore := cstore() + c
+  cn foreach register
+  false
 }
+
 def register(c: Constraint): Unit = {
-  val cs = cstore()
-  if (cs.contains(c)) return
-  if (conflict(cs,c)) throw Backtrack
-  else cstore := cs + c
+  if (cstore().contains(c)) return
+  if (conflict(cstore(),c)) throw Backtrack
 }
 }
 

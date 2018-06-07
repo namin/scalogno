@@ -233,10 +233,6 @@ trait Engine extends Base {
       }
     }
 
-    def propagate(): Boolean = { // propagate constraints and look for contradictions
-      true
-    }
-
     val varCount1 = varCount
     val Done = new Exception
     var rn = 0
@@ -244,13 +240,10 @@ trait Engine extends Base {
     try {
       val q = fresh[T]
       rec(() => f(q)){() =>
-        if (propagate()) {
-          //println(extractStr(q))
-          res += extractStr(q)
-          rn += 1
-          if (rn>=max) {
-            throw Done
-          }
+        res += extractStr(q)
+        rn += 1
+        if (rn>=max) {
+          throw Done
         }
       }
     } catch {

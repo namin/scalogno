@@ -39,15 +39,22 @@ def freshId = {
     f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X],fresh[Y],fresh[Z])
   }
 
-  def DVar[T](default: T): DVar[T] = new DVar(default)
-
 // dynamically scoped variables
-var dvars: Map[DVar[_], Any] =
-  Map.empty withDefault (_.default)
-class DVar[T](val default: T) {
-  def apply()  = dvars(this).asInstanceOf[T]
-  def :=(v: T) = dvars += this -> v
+var dvars: Map[Int, Any] = Map.empty
+  case class DVar[T](val id: Int, val default: T) extends (() => T) {
+  dvar_set(id,default)
+  def apply()  = dvar_get[T](id)
+  def :=(v: T) = dvar_set[T](id,v)
 }
+var dvarCount = 0
+def DVar[T](v: T): DVar[T] = {
+  val id = dvarCount
+  dvarCount += 1
+  new DVar[T](id, v)
+}
+def dvar_set[T](id: Int, v: T): Unit = dvars += id -> v
+def dvar_get[T](id: Int): T = dvars(id).asInstanceOf[T]
+def dvar_upd[T](id: Int)(f: T => T): Unit = dvars += id -> f(dvar_get(id))
 
 // relations
 trait Rel { def exec(call: Exec)(k: Cont): Unit }
@@ -88,7 +95,7 @@ case class IsTerm(id: Int, key: String, args: List[Exp[Any]])
 case class IsEqual(x: Exp[Any], y: Exp[Any]) 
   extends Constraint
 
-val cstore = new DVar[Set[Constraint]](Set.empty)
+val cstore: DVar[Set[Constraint]] = DVar(Set.empty)
 def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
   def prop(c1: Constraint, c2: Constraint)(fail: () => Nothing): List[Constraint] = (c1,c2) match {
     case (IsEqual(a1,b1), IsEqual(a2,b2)) if a1 == a2 || a1 == b2 || b1 == a2 || b1 == b2 =>
@@ -114,7 +121,7 @@ def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
   val fail = () => throw Backtrack
 
   val cn = cs flatMap { c2 => prop(c, c2)(fail) }
-  cstore := cstore() + c
+  dvar_upd[Set[Constraint]](cstore.id)(x => x + c)
   cn foreach register
   false
 }

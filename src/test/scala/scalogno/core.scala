@@ -623,7 +623,7 @@ class TestProb extends MySuite with ListBase with NatBase with Engine {
 
 }
 
-
+/*
 trait TablingBase extends Base with Engine {
 
   def memo(goal: Exp[Any])(a: => Rel): Rel
@@ -1166,3 +1166,4 @@ class TestTablingMore extends MySuite with ListBase with NatBase with TablingImp
     }
   }
 }
+*/

@@ -306,7 +306,7 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
   // auto reification !!!
 
   var allclauses = Map[String,Clause]()
-  val moregoals = DVar(fresh[List[Goal]])
+  val moregoals: DVar[Exp[List[Goal]]] = DVar(fresh)
 
   def rule[A,B](s: String)(f:(Exp[A], Exp[B]) => Rel) = {
     def goalTerm(a: Exp[A], b: Exp[B]) = term[Goal](s,List(a,b))
@@ -377,11 +377,12 @@ trait ReifyUtilsBase extends Base with InjectBase with ListBase with Engine {
 }
 
 trait ReifyUtilsDynVars extends ReifyUtilsBase with InjectBase with ListBase with Engine {
-  val globalTrace = DVar(nil: Exp[List[List[String]]])
+  val _globalTrace = DVar(nil: Exp[List[List[String]]])
+  override def globalTrace = () => _globalTrace()
 
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel =
     { (a,b) =>
-      globalTrace := cons(term(s,List(a,b)), globalTrace())
+      _globalTrace := cons(term(s,List(a,b)), _globalTrace())
       f(a,b)
     }
 }

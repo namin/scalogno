@@ -1,4 +1,4 @@
-package scalogno
+package scalogno.old
 
 trait Base {
   case class Exp[+T](id: Int)

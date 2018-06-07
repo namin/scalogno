@@ -2,7 +2,44 @@ package scalogno
 
 import scala.collection._
 
-trait FigEngine {
+trait Base {
+val Backtrack = new Exception
+
+var varCount: Int = 0
+def freshId = {
+  var id = varCount
+  varCount += 1
+  id
+}
+
+  implicit class RelOps(a: => Rel) {
+    def &&(b: => Rel) = infix_&&(a,b)
+    def ||(b: => Rel) = infix_||(a,b)
+  }
+  implicit class ExpOps[T](a: Exp[T]) {
+    def ===[U](b: Exp[U]) = infix_===(a,b)
+  }
+
+  def exists[T,U](f: (Exp[T],Exp[U]) => Rel): Rel = {
+    f(fresh[T],fresh[U])
+  }
+  def exists[T,U,V](f: (Exp[T],Exp[U],Exp[V]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V])
+  }
+  def exists[T,U,V,W](f: (Exp[T],Exp[U],Exp[V],Exp[W]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V],fresh[W])
+  }
+  def exists[T,U,V,W,X](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X])
+  }
+  def exists[T,U,V,W,X,Y](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X],Exp[Y]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X],fresh[Y])
+  }
+  def exists[T,U,V,W,X,Y,Z](f: (Exp[T],Exp[U],Exp[V],Exp[W],Exp[X],Exp[Y],Exp[Z]) => Rel): Rel = {
+    f(fresh[T],fresh[U],fresh[V],fresh[W],fresh[X],fresh[Y],fresh[Z])
+  }
+
+  def DVar[T](default: T): DVar[T] = new DVar(default)
 
 // dynamically scoped variables
 var dvars: Map[DVar[_], Any] =
@@ -61,7 +98,9 @@ def register(c: Constraint): Unit = {
   if (conflict(cs,c)) throw Backtrack
   else cstore := cs + c
 }
+}
 
+trait Engine extends Base {
 // execution (depth-first)
 def run[T](f: Exp[T] => Rel): Seq[String] = {
   def call(e: () => Rel)(k: Cont): Unit = {
@@ -82,14 +121,30 @@ def run[T](f: Exp[T] => Rel): Seq[String] = {
   res.toList
 }
 
-val Backtrack = new Exception
-
-var varCount: Int = 0
-def freshId = {
-  var id = varCount
-  varCount += 1
-  id
+def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
+  def call(e: () => Rel)(k: Cont): Unit = {
+    val dvars1 = dvars
+    try {
+      e().exec(call)(k)
+    } catch {
+      case Backtrack => // OK
+    } finally {
+      dvars = dvars1
+    }
+  }
+  val q = fresh[T]
+  val res = mutable.ListBuffer[String]()
+  val Done = new Exception
+  try {
+  call(() => f(q)) { () =>
+    res += extractStr(q)
+    if (res.length>=max) throw Done
+  }
+  } catch { case Done => }
+  res.toList
 }
+
+  // def extractStr(x: Exp[Any]): String
 
   def dump(out: java.io.PrintWriter)(x: Exp[Any]): Unit = {
     val idx = cstore() groupBy { case IsTerm(id, _ , _) => id case _ => -1 }

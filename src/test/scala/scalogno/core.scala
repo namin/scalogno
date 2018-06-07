@@ -110,7 +110,7 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
 
   test("mapf") {
     try {
-      delayedMode = true
+      //delayedMode = true
 
       expectResult(List("cons(a,cons(b,cons(c,cons(d,cons(e,cons(f,nil))))))")) {
         run[List[String]] { q =>
@@ -143,7 +143,7 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
       }
 
     } finally {
-      delayedMode = false
+      //delayedMode = false
     }
   }
 
@@ -647,8 +647,8 @@ trait Tabling1 extends TablingBase {
     enabled = on
   }
 
-  def memo(goal: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
-    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+  def memo(goal: Exp[Any])(a: => Rel): Rel = new Rel {
+    override def exec(rec: Exec)(k: Cont): Unit = {
       val key = extractStr(goal)
       table.get(key) match {
         case Some(goal1) if enabled =>
@@ -672,7 +672,7 @@ trait Tabling1 extends TablingBase {
 
 }
 
-
+/*
 trait Tabling2 extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
@@ -691,9 +691,8 @@ trait Tabling2 extends TablingBase {
 
 
   def constrainAs(g1: Exp[Any]): Answer = { // TODO!
-    val lcstore = cstore
-    val lcindex = cindex
-    val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+    val lcstore = cstore()
+    val lidx = cstore() groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
 
     val k1 = extractStr(g1)
     (g2: Exp[Any]) => {
@@ -732,8 +731,8 @@ trait Tabling2 extends TablingBase {
     }
   }
 
-  def memo(goal0: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
-    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+  def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
+    override def run(rec: Exec)(k: Cont): Unit = {
       if (!enabled) return rec(() => a)(k)
 
       val dvarsRange = (0 until dvarCount).toList
@@ -741,10 +740,10 @@ trait Tabling2 extends TablingBase {
       def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
       def invoke(cont: Cont, a: Answer) = {
-        val (goal1, cstore1, cindex1, dvars1, ldvars0, ldvars1, k1) = cont
+        val (goal1, cstore1, dvars1, ldvars0, ldvars1, k1) = cont
         rec{ () =>
           // reset state to state at call
-          cstore = cstore1; cindex = cindex1; dvars = dvars1
+          cstore := cstore1; dvars = dvars1
           // equate actual state with symbolic before state
           dvarsEqu(ldvars0)
           // load constraints from answer
@@ -764,7 +763,7 @@ trait Tabling2 extends TablingBase {
       // but disregard state for memoization (compute key for goal0)
       val key = extractStr(goal0)
 
-      val cont = (goal,cstore,cindex,dvars,ldvars0,ldvars1,k) // save complete call state
+      val cont = (goal,cstore(),dvars,ldvars0,ldvars1,k) // save complete call state
       contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
         case Some(answers) =>
@@ -802,7 +801,7 @@ trait Tabling2 extends TablingBase {
     }
   }
 }
-
+*/
 
 trait TestTablingAppBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
   def exp(s0: Exp[List[String]], s: Exp[List[String]]): Rel = memo(term("exp", List(s0,s))) {
@@ -875,7 +874,7 @@ trait TestTablingAppBase extends MySuite with ListBase with NatBase with Tabling
   }
 }
 
-class TestTablingApp2 extends TestTablingAppBase with Tabling2 // Tabling1 does not work
+// class TestTablingApp2 extends TestTablingAppBase with Tabling2 // Tabling1 does not work
 
 trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
 
@@ -916,6 +915,7 @@ trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBas
 
 class TestTabling1 extends TestTablingBase with Tabling1
 
+/*
 class TestTabling2 extends TestTablingBase with Tabling2 {
 
   def edge(x:Exp[String],y:Exp[String]) =
@@ -1009,8 +1009,8 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
     }
   }
 
-  def dlet[T](p: (DVar[T],T))(body: =>Rel): Rel = new Custom("dlet") {
-    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+  def dlet[T](p: (DVar[T],T))(body: =>Rel): Rel = new Rel {
+    override def run(rec: Exec)(k: Cont): Unit = {
       val (v,x) = p
       val old = v()
       v := x
@@ -1136,3 +1136,4 @@ class TestTabling3 extends MySuite with ListBase with NatBase with Tabling2 with
     }
   }
 }
+*/

@@ -636,41 +636,132 @@ trait TablingBase extends Base with Engine {
 
 
 trait TablingImpl extends TablingBase {
+  type Answer = (Exp[Any] => Unit)
+  type Cont = (Exp[Any], Set[Constraint], Map[Int, Set[Constraint]], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], (() => Unit))
 
-  type Entry = Exp[Any]
-
-  var table = new scala.collection.mutable.HashMap[String, Entry]
+  val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
+  val contTable = new scala.collection.mutable.HashMap[String, List[Cont]]
 
   var enabled = true
 
   def tabling(on: Boolean): Unit = {
-    table.clear
+    ansTable.clear
+    contTable.clear
     enabled = on
   }
 
-  def memo(goal: Exp[Any])(a: => Rel): Rel = new Rel {
-    override def exec(rec: Exec)(k: Cont): Unit = {
-      val key = extractStr(goal)
-      table.get(key) match {
-        case Some(goal1) if enabled =>
-          dprintln(key + " seen: " + extractStr(goal1))
-          goal === goal1 // FIXME: not general enough!!!
-          // TODO: invoke continuation with all stored answers
-          // store continuation so that it can be called for future answers
-          k()
+
+  def constrainAs(g1: Exp[Any]): Answer = { // TODO!
+    val lcstore = cstore
+    val lcindex = cindex
+    val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+
+    val k1 = extractStr(g1)
+    (g2: Exp[Any]) => {
+
+      val stack = new scala.collection.mutable.BitSet(varCount)
+      val seenVars= new scala.collection.mutable.HashMap[Int,Int]
+      def copyVar(x: Exp[Any]): Exp[Any] = {
+        val id = (Set(x.id) ++ (lcstore collect {
+          case IsEqual(`x`,y) if y.id < x.id => y.id
+          case IsEqual(y,`x`) if y.id < x.id => y.id
+        })).min
+        val mid = seenVars.getOrElseUpdate(id,seenVars.size)
+        Exp(mid)
+      }
+      def copyTerm(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
+        case Some(IsTerm(id, key, args)) =>
+          assert(id == x.id)
+          assert(!stack.contains(id), "cyclic terms not handled")
+          try {
+            stack += id
+            term(key, args map copyTerm)
+          } finally {
+            stack -= id
+          }
         case _ =>
-          println(key)
-          table(key) = goal
-          rec(() => a) { () =>
-            if (enabled) dprintln("answer for "+key+": " + extractStr(goal))
-            // TODO: memoize answer (if exists ignore?)
-            // invoke all stored continuations with new answer
-            k()
+          copyVar(x)
+      }
+
+      val g1x = copyTerm(g1)
+      val k1x = extractStr(g1x)
+      //assert(k1x == k1, s"expect $k1 but got $k1x") disabled for dvar init: default might not be written yet
+      val k2 = extractStr(g2)
+      dprintln(s"$k2 --> $k1")
+
+      g1x === g2
+    }
+  }
+
+  def memo(goal0: Exp[Any])(a: => Rel): Rel = new Custom("memo") {
+    override def run(rec: (() => Rel) => (() => Unit) => Unit)(k: () => Unit): Unit = {
+      if (!enabled) return rec(() => a)(k)
+
+      val dvarsRange = (0 until dvarCount).toList
+      def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
+      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
+
+      def invoke(cont: Cont, a: Answer) = {
+        val (goal1, cstore1, cindex1, dvars1, ldvars0, ldvars1, k1) = cont
+        rec{ () =>
+          // reset state to state at call
+          cstore = cstore1; cindex = cindex1; dvars = dvars1
+          // equate actual state with symbolic before state
+          dvarsEqu(ldvars0)
+          // load constraints from answer
+          a(goal1);
+          // update actual state to symbolic after state
+          dvarsSet(ldvars1)
+          Yes
+        }(k1)
+      }
+
+      val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
+      val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
+
+      // extend goal with symbolic state before and after
+      val goal = term("goal",List(goal0, term("state0", ldvars0), term("state1", ldvars1)))
+
+      // but disregard state for memoization (compute key for goal0)
+      val key = extractStr(goal0)
+
+      val cont = (goal,cstore,cindex,dvars,ldvars0,ldvars1,k) // save complete call state
+      contTable(key) = cont::contTable.getOrElse(key,Nil)
+      ansTable.get(key) match {
+        case Some(answers) =>
+          //dprintln("found " + key)
+          for ((ansKey, ansConstr) <- answers.toList) // mutable! convert to list
+            invoke(cont,ansConstr)
+        case _ =>
+          dprintln(key)
+          val ansMap = new scala.collection.mutable.HashMap[String, Answer]
+          ansTable(key) = ansMap
+          rec { () =>
+            // evaluate goal with symbolic before state, to obtain rep of state after
+            dvarsSet(ldvars0)
+            a
+          } { () =>
+            // constraint symbolic after state
+            dvarsEqu(ldvars1)
+            // disregard state again for memoization
+            val ansKey = extractStr(goal0)
+            ansMap.get(ansKey) match {
+              case None =>
+                dprintln("answer for "+key+": " + ansKey)
+                val ansConstr = constrainAs(goal)
+                ansMap(ansKey) = ansConstr
+                var i = 0
+                for (cont1 <- contTable(key).reverse) {
+                  //println("call cont "+i+" with "+key+" -> "+ansKey); i+=1
+                  invoke(cont1,ansConstr)
+                }
+              case Some(_) => // fail
+                //println("answer for "+key+": " + ansKey + " (duplicate)")
+            }
           }
       }
     }
   }
-
 }
 
 trait TestTablingAppBase extends MySuite with ListBase with NatBase with TablingBase with Engine {

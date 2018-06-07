@@ -11,6 +11,7 @@ class MySuite extends FunSuite {
 class TestNats extends MySuite with Base with Engine with NatBase with ListBase {
 
   test("lte") {
+    // ASK(Tiark): why is there only 4 in the result. What about 5, 6, 7...?
     expectResult(List("s(s(s(s(x0))))")) {
       run[Int] { q =>
         lessThan(3, q)
@@ -19,7 +20,7 @@ class TestNats extends MySuite with Base with Engine with NatBase with ListBase 
   }
 
 }
-/*
+
 class TestLists extends MySuite with Base with Engine with NatBase with ListBase {
 
   test("append") {
@@ -108,6 +109,7 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
     }
   }
 
+  /*
   test("mapf") {
     try {
       //delayedMode = true
@@ -146,6 +148,7 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
       //delayedMode = false
     }
   }
+  */
 
   test("flatMap") {
     expectResult(List("cons(a,cons(a,cons(b,cons(b,cons(c,cons(c,nil))))))")) {
@@ -190,7 +193,7 @@ class TestLists extends MySuite with Base with Engine with NatBase with ListBase
   }
 }
 
-
+/*
 class TestTrees extends MySuite with Base with Engine with NatBase with ListBase with TreeBase {
 
   test("tree") {

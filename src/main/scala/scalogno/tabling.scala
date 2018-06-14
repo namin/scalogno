@@ -49,7 +49,7 @@ trait TablingImpl extends TablingBase {
 
     // but disregard state for memoization (compute key for goal0)
     val key = extractStr(goal0)
-    val cont = Call(key, goal,cstore,dvars,ldvars0,ldvars1,k)
+    val cont = Call(key,goal,cstore,dvars,ldvars0,ldvars1,k)
     contTable(key) = cont::contTable.getOrElse(key,Nil)
     cont
   }

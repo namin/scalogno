@@ -79,7 +79,6 @@ def infix_||(a: => Rel, b: => Rel): Rel = new Rel {
 case class Exp[+T](id: Int)
 def fresh[T] = Exp(freshId)
 
-
 def exists[T](f: Exp[T] => Rel): Rel = f(fresh)
 
 def infix_===[T](a: => Exp[T], b: => Exp[T]): Rel = {

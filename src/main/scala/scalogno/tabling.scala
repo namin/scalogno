@@ -12,19 +12,19 @@ trait TablingBase extends Base with Engine {
 }
 
 trait TablingImpl extends TablingBase {
-  type Answer = (Exp[Any] => Unit)
-  case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
-    def load(ans: Answer): Unit = {
-      // reset state to state at call
-      cstore = cstore1; dvars = dvars1
-      // equate actual state with symbolic before state
-      dvarsEqu(ldvars0)
-      // load constraints from answer
-      ans(goal1);
-      // update actual state to symbolic after state
-      dvarsSet(ldvars1)
-    }
+type Answer = (Exp[Any] => Unit)
+case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
+  def load(ans: Answer): Unit = {
+    // reset state to state at call
+    cstore = cstore1; dvars = dvars1
+    // equate actual state with symbolic before state
+    dvarsEqu(ldvars0)
+    // load constraints from answer
+    ans(goal1);
+    // update actual state to symbolic after state
+    dvarsSet(ldvars1)
   }
+}
 
   val ansTable = new mutable.HashMap[String, mutable.HashMap[String, Answer]]
   val contTable = new mutable.HashMap[String, List[Call]]

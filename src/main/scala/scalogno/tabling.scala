@@ -1,4 +1,5 @@
 package scalogno
+import scala.collection._
 
 trait TablingBase extends Base with Engine {
 
@@ -13,10 +14,10 @@ trait TablingBase extends Base with Engine {
 trait TablingImpl extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  type Call = (Exp[Any], Set[Constraint], Map[Int, Any], List[Exp[Any]], List[Exp[Any]], Cont)
+  type Call = (Exp[Any], immutable.Set[Constraint], immutable.Map[Int, Any], List[Exp[Any]], List[Exp[Any]], Cont)
 
-  val ansTable = new scala.collection.mutable.HashMap[String, scala.collection.mutable.HashMap[String, Answer]]
-  val contTable = new scala.collection.mutable.HashMap[String, List[Call]]
+  val ansTable = new mutable.HashMap[String, mutable.HashMap[String, Answer]]
+  val contTable = new mutable.HashMap[String, List[Call]]
 
   var enabled = true
 
@@ -27,15 +28,15 @@ trait TablingImpl extends TablingBase {
   }
 
 
-  def constrainAs(g1: Exp[Any]): Answer = { // TODO!
+  def constrainAs(g1: Exp[Any]): Answer = {
     val lcstore = cstore
     val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
 
     val k1 = extractStr(g1)
     (g2: Exp[Any]) => {
 
-      val stack = new scala.collection.mutable.BitSet(varCount)
-      val seenVars= new scala.collection.mutable.HashMap[Int,Int]
+      val stack = new mutable.BitSet(varCount)
+      val seenVars= new mutable.HashMap[Int,Int]
       def copyVar(x: Exp[Any]): Exp[Any] = {
         val id = (Set(x.id) ++ (lcstore collect {
           case IsEqual(`x`,y) if y.id < x.id => y.id

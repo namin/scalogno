@@ -14,7 +14,7 @@ trait TablingBase extends Base with Engine {
 trait TablingImpl extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  case class Call(goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
+  case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
     def load(ans: Answer): Unit = {
       // reset state to state at call
       cstore = cstore1; dvars = dvars1
@@ -38,8 +38,23 @@ trait TablingImpl extends TablingBase {
     enabled = on
   }
 
+  // save complete call state
+  def makeCall(goal0: Exp[Any], k: Cont): Call = {
+    val dvarsRange = (0 until dvarCount).toList
+    val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
+    val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
 
-  def constrainAs(g1: Exp[Any]): Answer = {
+    // extend goal with symbolic state before and after
+    val goal = term("goal",List(goal0, term("state0", ldvars0), term("state1", ldvars1)))
+
+    // but disregard state for memoization (compute key for goal0)
+    val key = extractStr(goal0)
+    val cont = Call(key, goal,cstore,dvars,ldvars0,ldvars1,k)
+    contTable(key) = cont::contTable.getOrElse(key,Nil)
+    cont
+  }
+
+  def makeAnswer(g1: Exp[Any]): Answer = {
     val lcstore = cstore
     val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
 
@@ -72,9 +87,7 @@ trait TablingImpl extends TablingBase {
 
       val g1x = copyTerm(g1)
       val k1x = extractStr(g1x)
-      //assert(k1x == k1, s"expect $k1 but got $k1x") disabled for dvar init: default might not be written yet
       val k2 = extractStr(g2)
-      dprintln(s"$k2 --> $k1")
 
       g1x === g2
     }
@@ -83,61 +96,37 @@ trait TablingImpl extends TablingBase {
   def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
   def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
-  def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
-    override def exec(rec: Exec)(k: Cont): Unit = {
-      if (!enabled) return rec(() => a)(k)
+def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
+  override def exec(rec: Exec)(k: Cont): Unit = {
+    if (!enabled) return rec(() => a)(k)
 
-      val dvarsRange = (0 until dvarCount).toList
+    def resume(cont: Call, ans: Answer) = rec{ () => cont.load(ans); Yes }(cont.k1)
 
-      def resume(cont: Call, ans: Answer) =
-        rec{ () => cont.load(ans); Yes }(cont.k1)
-
-      val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
-      val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
-
-      // extend goal with symbolic state before and after
-      val goal = term("goal",List(goal0, term("state0", ldvars0), term("state1", ldvars1)))
-
-      // but disregard state for memoization (compute key for goal0)
-      val key = extractStr(goal0)
-
-      val cont = Call(goal,cstore,dvars,ldvars0,ldvars1,k) // save complete call state
-      contTable(key) = cont::contTable.getOrElse(key,Nil)
-      ansTable.get(key) match {
-        case Some(answers) =>
-          //dprintln("found " + key)
-          for ((ansKey, ansConstr) <- answers.toList) // mutable! convert to list
-            resume(cont,ansConstr)
-        case _ =>
-          dprintln(key)
-          val ansMap = new scala.collection.mutable.HashMap[String, Answer]
-          ansTable(key) = ansMap
-          rec { () =>
-            // evaluate goal with symbolic before state, to obtain rep of state after
-            dvarsSet(ldvars0)
-            a
-          } { () =>
-            // constraint symbolic after state
-            dvarsEqu(ldvars1)
-            // disregard state again for memoization
-            val ansKey = extractStr(goal0)
-            ansMap.get(ansKey) match {
-              case None =>
-                dprintln("answer for "+key+": " + ansKey)
-                val ansConstr = constrainAs(goal)
-                ansMap(ansKey) = ansConstr
-                var i = 0
-                for (cont1 <- contTable(key).reverse) {
-                  //println("call cont "+i+" with "+key+" -> "+ansKey); i+=1
-                  resume(cont1,ansConstr)
-                }
-              case Some(_) => // fail
-                //println("answer for "+key+": " + ansKey + " (duplicate)")
-            }
+    val cont = makeCall(goal0, k)
+    ansTable.get(cont.key) match {
+      case Some(answers) =>
+        // continue with stored answers
+        for (ans <- answers.values) resume(cont, ans)
+      case None =>
+        val ansMap = new mutable.HashMap[String, Answer]
+        ansTable(cont.key) = ansMap
+        rec { () =>
+          dvarsSet(cont.ldvars0)
+          a
+        } { () =>
+          dvarsEqu(cont.ldvars1)
+          val ansKey = extractStr(goal0)
+          ansMap.get(ansKey) match {
+            case None =>
+              val ans = makeAnswer(cont.goal1)
+              ansMap(ansKey) = ans
+              for (cont1 <- contTable(cont.key).reverse) {
+                resume(cont1, ans)
+              }
+            case Some(_) => // fail
           }
-      }
+        }
     }
   }
 }
-
-
+}

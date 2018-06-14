@@ -40,7 +40,7 @@ def freshId = {
   }
 
 // dynamically scoped variables
-var dvars: scala.collection.immutable.Map[Int, Any] = Map.empty
+var dvars: immutable.Map[Int, Any] = Map.empty
 case class DVar[T](val id: Int, val default: T) extends (() => T) {
   dvar_set(id,default)
   def apply()  = dvar_get[T](id)
@@ -95,7 +95,7 @@ case class IsTerm(id: Int, key: String, args: List[Exp[Any]])
 case class IsEqual(x: Exp[Any], y: Exp[Any]) 
   extends Constraint
 
-var cstore: scala.collection.immutable.Set[Constraint] = scala.collection.immutable.Set.empty
+var cstore: immutable.Set[Constraint] = immutable.Set.empty
 def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
   def prop(c1: Constraint, c2: Constraint)(fail: () => Nothing): List[Constraint] = (c1,c2) match {
     case (IsEqual(a1,b1), IsEqual(a2,b2)) if a1 == a2 || a1 == b2 || b1 == a2 || b1 == b2 =>
@@ -184,9 +184,9 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
 
   def dump(out: java.io.PrintWriter)(x: Exp[Any]): Unit = {
     val idx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
-    val stack = new scala.collection.mutable.BitSet(varCount)
-    val stack2 = new scala.collection.mutable.BitSet(varCount)
-    val seenVars = new scala.collection.mutable.HashMap[Int,Int]
+    val stack = new mutable.BitSet(varCount)
+    val stack2 = new mutable.BitSet(varCount)
+    val seenVars = new mutable.HashMap[Int,Int]
     def canon(x: Exp[Any]): String = {
       val id = (Set(x.id) ++ (cstore collect {
         case IsEqual(`x`,y) if y.id < x.id => y.id

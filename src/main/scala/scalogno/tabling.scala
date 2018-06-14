@@ -53,44 +53,48 @@ trait TablingImpl extends TablingBase {
     cont
   }
 
-  def makeAnswer(g1: Exp[Any]): Answer = {
-    val lcstore = cstore
-    val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+def makeAnswer(g1: Exp[Any]): Answer = {
+  val lcstore = cstore
+  val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
 
-    (g2: Exp[Any]) => {
+  (g2: Exp[Any]) => {
 
-      val stack = new mutable.BitSet(varCount)
-      val seenVars= new mutable.HashMap[Int,Int]
-      def copyVar(x: Exp[Any]): Exp[Any] = {
-        val id = (Set(x.id) ++ (lcstore collect {
-          case IsEqual(`x`,y) if y.id < x.id => y.id
-          case IsEqual(y,`x`) if y.id < x.id => y.id
-        })).min
-        val mid = seenVars.getOrElseUpdate(id,seenVars.size)
-        Exp(mid)
-      }
-      def copyTerm(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
-        case Some(IsTerm(id, key, args)) =>
-          assert(id == x.id)
-          assert(!stack.contains(id), "cyclic terms not handled")
-          try {
-            stack += id
-            term(key, args map copyTerm)
-          } finally {
-            stack -= id
-          }
-        case _ =>
-          copyVar(x)
-      }
-
-      val g1x = copyTerm(g1)
-
-      g1x === g2
+    val stack = new mutable.BitSet(varCount)
+    val seenVars = new mutable.HashMap[Int,Int]
+    def copyVar(x: Exp[Any]): Exp[Any] = {
+      val id = (Set(x.id) ++ (lcstore collect {
+        case IsEqual(`x`,y) if y.id < x.id => y.id
+        case IsEqual(y,`x`) if y.id < x.id => y.id
+      })).min
+      val mid = seenVars.getOrElseUpdate(id,seenVars.size)
+      Exp(mid)
     }
-  }
+    def copyTerm(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
+      case Some(IsTerm(id, key, args)) =>
+        assert(id == x.id)
+        assert(!stack.contains(id), "cyclic terms not handled")
+        try {
+          stack += id
+          term(key, args map copyTerm)
+        } finally {
+          stack -= id
+        }
+      case _ =>
+        copyVar(x)
+    }
 
-  def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
-  def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
+    val g1_copy = copyTerm(g1)
+
+    g1_copy === g2
+  }
+}
+
+def dvarsSet(ls: List[Exp[Any]]) = {
+  val dv = dvars
+  dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) }
+}
+def dvarsEqu(ls: List[Exp[Any]]) =
+  dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
 def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
   override def exec(rec: Exec)(k: Cont): Unit = {

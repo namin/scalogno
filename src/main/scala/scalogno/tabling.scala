@@ -26,8 +26,8 @@ case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint]
   }
 }
 
-  val ansTable = new mutable.HashMap[String, mutable.HashMap[String, Answer]]
-  val contTable = new mutable.HashMap[String, List[Call]]
+val ansTable = new mutable.HashMap[String, mutable.HashMap[String, Answer]]
+val contTable = new mutable.HashMap[String, List[Call]]
 
   var enabled = true
 
@@ -37,21 +37,21 @@ case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint]
     enabled = on
   }
 
-  // save complete call state
-  def makeCall(goal0: Exp[Any], k: Cont): Call = {
-    val dvarsRange = (0 until dvarCount).toList
-    val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
-    val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
+// save complete call state
+def makeCall(goal0: Exp[Any], k: Cont): Call = {
+  val dvarsRange = (0 until dvarCount).toList
+  val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
+  val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
 
-    // extend goal with symbolic state before and after
-    val goal = term("goal",List(goal0, term("state0", ldvars0), term("state1", ldvars1)))
+  // extend goal with symbolic state before and after
+  val goal = term("goal",List(goal0, term("state0", ldvars0), term("state1", ldvars1)))
 
-    // but disregard state for memoization (compute key for goal0)
-    val key = extractStr(goal0)
-    val cont = Call(key,goal,cstore,dvars,ldvars0,ldvars1,k)
-    contTable(key) = cont::contTable.getOrElse(key,Nil)
-    cont
-  }
+  // but disregard state for memoization (compute key for goal0)
+  val key = extractStr(goal0)
+  val cont = Call(key,goal,cstore,dvars,ldvars0,ldvars1,k)
+  contTable(key) = cont::contTable.getOrElse(key,Nil)
+  cont
+}
 
 def makeAnswer(g1: Exp[Any]): Answer = {
   val lcstore = cstore

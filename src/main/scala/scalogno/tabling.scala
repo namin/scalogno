@@ -105,7 +105,6 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
     val cont = makeCall(goal0, k)
     ansTable.get(cont.key) match {
       case Some(answers) =>
-        // continue with stored answers
         for (ans <- answers.values) resume(cont, ans)
       case None =>
         val ansMap = new mutable.HashMap[String, Answer]
@@ -123,7 +122,7 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
               for (cont1 <- contTable(cont.key).reverse) {
                 resume(cont1, ans)
               }
-            case Some(_) => // fail
+            case Some(_) =>
           }
         }
     }

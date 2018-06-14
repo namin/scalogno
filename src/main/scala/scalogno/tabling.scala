@@ -14,7 +14,18 @@ trait TablingBase extends Base with Engine {
 trait TablingImpl extends TablingBase {
 
   type Answer = (Exp[Any] => Unit)
-  type Call = (Exp[Any], immutable.Set[Constraint], immutable.Map[Int, Any], List[Exp[Any]], List[Exp[Any]], Cont)
+  case class Call(goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
+    def load(ans: Answer): Unit = {
+      // reset state to state at call
+      cstore = cstore1; dvars = dvars1
+      // equate actual state with symbolic before state
+      dvarsEqu(ldvars0)
+      // load constraints from answer
+      ans(goal1);
+      // update actual state to symbolic after state
+      dvarsSet(ldvars1)
+    }
+  }
 
   val ansTable = new mutable.HashMap[String, mutable.HashMap[String, Answer]]
   val contTable = new mutable.HashMap[String, List[Call]]
@@ -69,28 +80,17 @@ trait TablingImpl extends TablingBase {
     }
   }
 
+  def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
+  def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
+
   def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
     override def exec(rec: Exec)(k: Cont): Unit = {
       if (!enabled) return rec(() => a)(k)
 
       val dvarsRange = (0 until dvarCount).toList
-      def dvarsSet(ls: List[Exp[Any]]) = { val dv = dvars; dv foreach { case (k,v:Exp[Any]) => dvars += (k -> ls(k)) } }
-      def dvarsEqu(ls: List[Exp[Any]]) = dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
-      def invoke(cont: Call, a: Answer) = {
-        val (goal1, cstore1, dvars1, ldvars0, ldvars1, k1) = cont
-        rec{ () =>
-          // reset state to state at call
-          cstore = cstore1; dvars = dvars1
-          // equate actual state with symbolic before state
-          dvarsEqu(ldvars0)
-          // load constraints from answer
-          a(goal1);
-          // update actual state to symbolic after state
-          dvarsSet(ldvars1)
-          Yes
-        }(k1)
-      }
+      def resume(cont: Call, ans: Answer) =
+        rec{ () => cont.load(ans); Yes }(cont.k1)
 
       val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
       val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
@@ -101,13 +101,13 @@ trait TablingImpl extends TablingBase {
       // but disregard state for memoization (compute key for goal0)
       val key = extractStr(goal0)
 
-      val cont: Call = (goal,cstore,dvars,ldvars0,ldvars1,k) // save complete call state
+      val cont = Call(goal,cstore,dvars,ldvars0,ldvars1,k) // save complete call state
       contTable(key) = cont::contTable.getOrElse(key,Nil)
       ansTable.get(key) match {
         case Some(answers) =>
           //dprintln("found " + key)
           for ((ansKey, ansConstr) <- answers.toList) // mutable! convert to list
-            invoke(cont,ansConstr)
+            resume(cont,ansConstr)
         case _ =>
           dprintln(key)
           val ansMap = new scala.collection.mutable.HashMap[String, Answer]
@@ -129,7 +129,7 @@ trait TablingImpl extends TablingBase {
                 var i = 0
                 for (cont1 <- contTable(key).reverse) {
                   //println("call cont "+i+" with "+key+" -> "+ansKey); i+=1
-                  invoke(cont1,ansConstr)
+                  resume(cont1,ansConstr)
                 }
               case Some(_) => // fail
                 //println("answer for "+key+": " + ansKey + " (duplicate)")

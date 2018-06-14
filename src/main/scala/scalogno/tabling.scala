@@ -12,7 +12,6 @@ trait TablingBase extends Base with Engine {
 }
 
 trait TablingImpl extends TablingBase {
-
   type Answer = (Exp[Any] => Unit)
   case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
     def load(ans: Answer): Unit = {
@@ -58,7 +57,6 @@ trait TablingImpl extends TablingBase {
     val lcstore = cstore
     val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
 
-    val k1 = extractStr(g1)
     (g2: Exp[Any]) => {
 
       val stack = new mutable.BitSet(varCount)
@@ -86,8 +84,6 @@ trait TablingImpl extends TablingBase {
       }
 
       val g1x = copyTerm(g1)
-      val k1x = extractStr(g1x)
-      val k2 = extractStr(g2)
 
       g1x === g2
     }

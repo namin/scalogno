@@ -242,3 +242,57 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
     out.toString
   }
 }
+
+// TODO: this could be incorporated more nicely into extractStr?
+trait Prettify {
+  class Str
+  case class ConsStr(a: Str, b: Str) extends Str
+  case object NilStr extends Str
+  case class AtomStr(s: String) extends Str
+  def balance(s: String): (String, String) = {
+    var p = 0
+    var i = 0
+    var stop = false
+    while (!stop && p >= 0 && i < s.length) {
+      val c = s(i)
+      i += 1
+      if (c == '(') { p += 1 }
+      else if (c == ')') { p -= 1 }
+      else if (c == ',' && p == 0) { stop = true; i -= 1 }
+    }
+    (s.substring(0, i), s.substring(i))
+  }
+  def structure(s: String): (Str, String) = {
+    if (s.startsWith("cons(")) {
+      val (a, ra) = structure(s.substring(5))
+      val (b, rb) = structure(ra.substring(1))
+      (ConsStr(a, b), rb.substring(1))
+    } else if (s.startsWith("nil")) {
+      (NilStr, s.substring(3))
+    } else {
+      val (a, r) = balance(s)
+      (AtomStr(a), r)
+    }
+  }
+    def addParen(p: (Boolean, String)) = {
+    val (need_paren, s) = p
+    if (need_paren) "("+s+")" else s
+  }
+  def pp(v: Str): (Boolean, String) = v match {
+    case AtomStr(s) => (false, s)
+    case NilStr => (true, "")
+    case ConsStr(a, NilStr) => (true, addParen(pp(a)))
+    case ConsStr(a, d) =>
+      val s1 = addParen(pp(a))
+      val (need_paren2, s2) = pp(d)
+      if (need_paren2) (true, s1+" "+s2)
+      else (true, s1+" . "+s2)
+  }
+  def pretty(s: String): String = {
+    val (a, r) = structure(s)
+    assert(r.isEmpty)
+    val (_, p) = pp(a)
+    p
+  }
+  def prettify(res: Seq[String]) = res.map(pretty)
+}

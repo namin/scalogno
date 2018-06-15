@@ -274,7 +274,7 @@ trait Prettify {
       (AtomStr(a), r)
     }
   }
-    def addParen(p: (Boolean, String)) = {
+  def addParen(p: (Boolean, String)) = {
     val (need_paren, s) = p
     if (need_paren) "("+s+")" else s
   }

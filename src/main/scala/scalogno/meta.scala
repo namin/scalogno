@@ -97,6 +97,17 @@ trait MetaReify extends MetaBase {
     {(a: Exp[A], b: Exp[B]) => g(List(a, b)) }
   }
 
+  def rule1[A](s: String)(f: Exp[A] => Rel): Exp[A] => Rel = {
+    val g: List[Exp[Any]] => Rel =
+      ruleList(s)(1)({ (xs: List[Exp[Any]]) =>
+        val List(xa) = xs
+        val a = xa.asInstanceOf[Exp[A]]
+        f(a)
+      })
+
+    {(a: Exp[A]) => g(List(a)) }
+  }
+
   def reifyGoals(goal: => Rel)(goals: Exp[List[Goal]]): Rel = {
     moregoals := goals
     goal && moregoals() === nil

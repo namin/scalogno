@@ -27,13 +27,13 @@ class TestDeriv extends MySuite with Deriv with MetaSTLC with STLC_ReverseDeBrui
 
   test("deriv_stlc") {
     expectResult(List(
-      "(tc(lam,|-(nil,lam(z,lam(s(z),@(var(z),var(s(z))))),->(->(x0,x1),->(x0,x1)))) <-- ((tc(lam,|-(cons(->(x0,x1),nil),lam(s(z),@(var(z),var(s(z)))),->(x0,x1))) <-- ((tc(app,|-(cons(x0,cons(->(x0,x1),nil)),@(var(z),var(s(z))),x1)) <-- ((tc(var,|-(cons(x0,cons(->(x0,x1),nil)),var(z),->(x0,x1))) <-- ()) (tc(var,|-(cons(x0,cons(->(x0,x1),nil)),var(s(z)),x0)) <-- ())))))))"
+      "(tc(|-(nil,lam(z,lam(s(z),@(var(z),var(s(z))))),->(->(x0,x1),->(x0,x1)))) <-- ((tc(|-(cons(->(x0,x1),nil),lam(s(z),@(var(z),var(s(z)))),->(x0,x1))) <-- ((tc(|-(cons(x0,cons(->(x0,x1),nil)),@(var(z),var(s(z))),x1)) <-- ((tc(|-(cons(x0,cons(->(x0,x1),nil)),var(z),->(x0,x1))) <-- ()) (tc(|-(cons(x0,cons(->(x0,x1),nil)),var(s(z)),x0)) <-- ())))))))"
     )) {
       prettify(runN[List[List[Goal]]](3) { q =>
         val x,y = fresh[Sym]
         val a = nil |- lam(x, lam(y, (sym(x) app sym(y)))) :: fresh[LType]
         exists[List[Goal]] { goals =>
-          reifyGoals(tc(a))(goals) &&
+          reifyGoals(typecheck(a))(goals) &&
           deriv(allclausesRel)(q)(goals)
         }
       })

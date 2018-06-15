@@ -60,26 +60,41 @@ trait MetaTracer extends MetaBase {
 }
 
 trait MetaReify extends MetaBase {
+  def existsList(a: Int)(f: (List[Exp[Any]] => Rel)): Rel = {
+    f((0 until a).map{_ => fresh[Any]}.toList)
+  }
+
   // auto reification !!!
 
   var allclauses = Map[String,Clause]()
   val moregoals: DVar[Exp[List[Goal]]] = DVar(fresh)
 
-  def rule[A,B](s: String)(f:(Exp[A], Exp[B]) => Rel) = {
-    def goalTerm(a: Exp[A], b: Exp[B]) = term[Goal](s,List(a,b))
-
+  def ruleList(s: String)(a: Int)(f: List[Exp[Any]] => Rel): List[Exp[Any]] => Rel = {
+    def goalTerm(xs: List[Exp[Any]]) = term[Goal](s,xs)
     allclauses += s ->
       { (head: Exp[Goal], body: Exp[List[Goal]]) =>
-        exists[A,B] { (a,b) =>
-          (head === goalTerm(a,b)) && reifyGoals(f(a,b))(body)
+        existsList(a) { xs =>
+          (head === goalTerm(xs)) && reifyGoals(f(xs))(body)
         }
       }
 
-    {(a: Exp[A], b: Exp[B]) =>
+    {(xs: List[Exp[Any]]) =>
       val hole = moregoals()
       moregoals := fresh
-      hole === cons(goalTerm(a,b),moregoals())
+      hole === cons(goalTerm(xs),moregoals())
     }
+  }
+
+  def rule[A,B](s: String)(f:(Exp[A], Exp[B]) => Rel): (Exp[A], Exp[B]) => Rel = {
+    val g: List[Exp[Any]] => Rel =
+      ruleList(s)(2)({ (xs: List[Exp[Any]]) =>
+        val List(xa, xb) = xs
+        val a = xa.asInstanceOf[Exp[A]]
+        val b = xb.asInstanceOf[Exp[B]]
+        f(a, b)
+      })
+
+    {(a: Exp[A], b: Exp[B]) => g(List(a, b)) }
   }
 
   def reifyGoals(goal: => Rel)(goals: Exp[List[Goal]]): Rel = {

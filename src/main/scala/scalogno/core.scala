@@ -191,7 +191,7 @@ trait GraphBase extends InjectBase with NatBase {
 
 }
 
-trait MetaGraphBase extends GraphBase with ListBase with Engine {
+trait MetaGraphBase extends GraphBase with ListBase with Engine with MetaVanilla with MetaReifyVanilla with MetaTracer {
 
 /*
 (define (patho-clause head tail)
@@ -203,8 +203,6 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
         (edgeo x z)
         (== tail ‘((patho ,z ,y))))))))
 */
-
-  trait Goal
 
   def pathTerm[T](a: Exp[T], b: Exp[T]) = term[Goal]("path",List(a,b))
 
@@ -234,61 +232,10 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
   }
 
 /*
-(define (vanilla* clause)
-  (define (solve* goals)
-    (conde
-      ((== goals ’()))
-      ((fresh (g gs body)
-        (== (cons g gs) goals)
-        (clause g body)
-        (solve* body)
-        (solve* gs)))))
-  solve*)
-
 (run 10 (q)
   ((vanilla* patho-clause)
    ‘((patho a ,q)))) => (b c a b c a b c a b)
-
 */
-
-  def vanilla(clause: Clause)(goals: Exp[List[Goal]]): Rel =
-    goals === nil ||
-    exists[Goal,List[Goal],List[Goal]] { (g, gs, body) =>
-      (goals === cons(g,gs)) &&
-      clause(g,body) &&
-      vanilla(clause)(body) &&
-      vanilla(clause)(gs)
-    }
-
-  type Clause = (Exp[Goal], Exp[List[Goal]]) => Rel
-
-/*
-(define (tracer* clause)
-  (define (solve* goals trace-in trace-out)
-    (conde
-      ((== goals '())
-       (== trace-in trace-out))
-      ((fresh (g gs body trace-out-body)
-         (== (cons g gs) goals)
-         (clause g body)
-         (solve* body (cons g trace-in) trace-out-body)
-         (solve* gs trace-out-body trace-out)))))
-  (lambda (goal t)
-    (solve* (list goal) '() t)))
-*/
-  def tracer(clause: Clause)(in: Exp[List[Goal]], out: Exp[List[Goal]])(goals: Exp[List[Goal]]): Rel =
-    ((goals === nil) && (in === out)) ||
-    exists[Goal,List[Goal],List[Goal],List[Goal]] { (g, gs, body, out_body) =>
-      (goals === cons(g,gs)) &&
-      clause(g,body) &&
-      tracer(clause)(cons(g,in),out_body)(body) &&
-      tracer(clause)(out_body,out)(gs)
-    }
-
-  def existsC[T,U](f: (Exp[T],Exp[U]) => Clause): Clause = {
-    f(fresh[T],fresh[U])
-  }
-
 
   def pathClause2[T](g: Graph[T])(a: Exp[T], b: Exp[T]) = { (head: Exp[Goal], body: Exp[List[Goal]]) =>
     (head === pathTerm(a,b)) && {
@@ -299,32 +246,6 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
     }
   }
 
-
-
-
-
-  // auto reification !!!
-
-  var allclauses = Map[String,Clause]()
-  val moregoals: DVar[Exp[List[Goal]]] = DVar(fresh)
-
-  def rule[A,B](s: String)(f:(Exp[A], Exp[B]) => Rel) = {
-    def goalTerm(a: Exp[A], b: Exp[B]) = term[Goal](s,List(a,b))
-
-    allclauses += s ->
-      { (head: Exp[Goal], body: Exp[List[Goal]]) =>
-        exists[A,B] { (a,b) =>
-          (head === goalTerm(a,b)) && reifyGoals(f(a,b))(body)
-        }
-      }
-
-    {(a: Exp[A], b: Exp[B]) =>
-      val hole = moregoals()
-      moregoals := fresh
-      hole === cons(goalTerm(a,b),moregoals())
-    }
-  }
-
   def path2[T](g: Graph[T]): (Exp[T],Exp[T])=> Rel =
     rule("path"/*+g.toString*/) { (a,b) =>
       g.edge(a,b) ||
@@ -332,42 +253,6 @@ trait MetaGraphBase extends GraphBase with ListBase with Engine {
         g.edge(a,z) && path2(g)(z,b)
       }
     }
-
-
-  def reifyGoals(goal: => Rel)(goals: Exp[List[Goal]]): Rel = {
-    moregoals := goals
-    goal && moregoals() === nil
-  }
-
-  def reifyClause(goal: => Rel)(head: Exp[Goal], body: Exp[List[Goal]]): Rel = {
-    reifyGoals(goal)(cons(head,nil)) && {
-      val s = extractStr(head)
-      val key = s.substring(0,s.indexOf("(")) // a bit hacky, but hey ...
-      println(key)
-      allclauses(key)(head,body)
-    }
-  }
-
-
-  def allclausesRel: Clause = { (head: Exp[Goal], body: Exp[List[Goal]]) =>
-    ((No:Rel) /: allclauses.values) ((r,c) => r || c(head,body))
-  }
-
-  def vanilla2(goal: => Rel): Rel =
-    exists[List[Goal]] { goals =>
-      reifyGoals(goal)(goals) && vanilla2(goals)
-    }
-
-  def vanilla2(goals: Exp[List[Goal]]): Rel = {
-    goals === nil ||
-    exists[Goal,List[Goal],List[Goal]] { (g, gs, body) =>
-      (goals === cons(g,gs)) &&
-      allclausesRel(g,body) &&
-      vanilla2(body) &&
-      vanilla2(gs)
-    }
-  }
-
 }
 
 

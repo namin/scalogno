@@ -15,3 +15,28 @@ trait Deriv extends MetaGraphBase {
     }
   }
 }
+
+trait MetaSTLC extends STLC with MetaGraphBase {
+  def tc(d: Exp[Deriv]): Rel = exists[String] { c => tcd(c, d) }
+  def tcd: (Exp[String], Exp[Deriv]) => Rel =
+    rule("tc") { (c,d) =>
+    (c === "var" && exists[Env,Sym,LType] { (G,x,t1) =>
+      val a = G |- sym(x) :: t1
+
+      d === a && lookup(G,x,t1)
+    }) ||
+    (c === "lam" && exists[Env,Env,Sym,LTerm,LType,LType] { (G,G1,x,e,t1,t2) =>
+      val a = G |- lam(x,e) :: (t1 -> t2)
+      val b = G1 |- e :: t2
+
+      d === a && extend(G,x,t1,G1) && tc(b)
+    }) ||
+    (c === "app" && exists[Env,LTerm,LTerm,LType,LType] { (G,e1,e2,t1,t2) =>
+      val a = G |- (e1 app e2) :: t2
+      val b = G |- e1 :: (t1 -> t2)
+      val c = G |- e2 :: t1
+
+      d === a && tc(b) && tc(c)
+    })
+    }
+}

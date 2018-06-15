@@ -1,7 +1,6 @@
 package scalogno
 
-class TestDeriv extends MySuite with Deriv with Prettify
-//with STLC with STLC_ReverseDeBruijn with STLC_Nat
+class TestDeriv extends MySuite with Deriv with MetaSTLC with STLC_ReverseDeBruijn with Prettify
 {
   val g = new Graph[String] {
     def edge(x:Exp[String],y:Exp[String]) =
@@ -21,6 +20,21 @@ class TestDeriv extends MySuite with Deriv with Prettify
       prettify(runN[List[List[Goal]]](5) { q =>
         exists[List[Any]] { p =>
           deriv(pathClause1(g))(q)(cons(pathTerm("a",p),nil))
+        }
+      })
+    }
+  }
+
+  test("deriv_stlc") {
+    expectResult(List(
+      "(tc(lam,|-(nil,lam(z,lam(s(z),@(var(z),var(s(z))))),->(->(x0,x1),->(x0,x1)))) <-- ((tc(lam,|-(cons(->(x0,x1),nil),lam(s(z),@(var(z),var(s(z)))),->(x0,x1))) <-- ((tc(app,|-(cons(x0,cons(->(x0,x1),nil)),@(var(z),var(s(z))),x1)) <-- ((tc(var,|-(cons(x0,cons(->(x0,x1),nil)),var(z),->(x0,x1))) <-- ()) (tc(var,|-(cons(x0,cons(->(x0,x1),nil)),var(s(z)),x0)) <-- ())))))))"
+    )) {
+      prettify(runN[List[List[Goal]]](3) { q =>
+        val x,y = fresh[Sym]
+        val a = nil |- lam(x, lam(y, (sym(x) app sym(y)))) :: fresh[LType]
+        exists[List[Goal]] { goals =>
+          reifyGoals(tc(a))(goals) &&
+          deriv(allclausesRel)(q)(goals)
         }
       })
     }

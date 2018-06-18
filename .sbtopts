@@ -1,6 +1,0 @@
--J-Xms6G
--J-Xmx6G
--J-Xss10M
--J-XX:+CMSClassUnloadingEnabled
--J-XX:MaxPermSize=6G
--J-XX:+UseParallelGC

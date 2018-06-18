@@ -209,7 +209,7 @@ trait MicroKanren {
 
 object mk extends MicroKanren
 
-object tests extends App {
+object mk_tests extends App {
   import mk._
 
   assert(run1[Any]{q => succeed} == List(Atom("_0")))

@@ -11,7 +11,6 @@ class MySuite extends FunSuite {
 class TestNats extends MySuite with Base with Engine with NatBase with ListBase {
 
   test("lte") {
-    // ASK(Tiark): why is there only 4 in the result. What about 5, 6, 7...?
     expectResult(List("s(s(s(s(x0))))")) {
       run[Int] { q =>
         lessThan(3, q)

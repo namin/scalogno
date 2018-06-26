@@ -43,6 +43,7 @@ trait Smt extends InjectBase with Engine {
     smt.write("(check-sat)")
     smt.readLine() match {
       case "sat" => {
+        getModel().foreach(register)
         Yes
       }
       case "unsat" => {
@@ -57,6 +58,32 @@ trait Smt extends InjectBase with Engine {
     }
   }
 
+  implicit object InjectInt extends Inject[Int] {
+    def toTerm(i: Int): Exp[Int] = term(i.toString,Nil)
+  }
+  implicit def int2ZInt(e: Int): Z[Int] = toZInt(InjectInt.toTerm(e))
+  implicit def toZInt(e: Exp[Int]): Z[Int] = A(e)
+  implicit def toZIntOps(e: Exp[Int]) = ZIntOps(A(e))
+  implicit class ZIntOps(a: Z[Int]) {
+    def ==?(b: Z[Int]): Rel = zAssert(P("=", List(a, b)))
+    def !=?(b: Z[Int]): Rel = zAssert(P("not", List(P("=", List(a, b)))))
+    def >(b: Z[Int]): Rel = zAssert(P(">", List(a, b)))
+    def -(b: Z[Int]): Z[Int] = P("-", List(a, b))
+    def *(b: Z[Int]): Z[Int] = P("*", List(a, b))
+    def +(b: Z[Int]): Z[Int] = P("+", List(a, b))
+  }
+
+  def getModel(): List[IsEqual] = {
+    val s = smt.readSExp()
+    val p = raw"\(define-fun x([0-9]+) \(\) Int ([0-9]+)\)".r
+    val cs = (for (m <- p.findAllMatchIn(s)) yield {
+      val id = m.group(1).toInt
+      val v = m.group(2).toInt
+      val e = IsEqual(Exp(id), v)
+      e
+    }).toList
+    cs
+  }
 }
 
 class Exe(command: String) {
@@ -81,6 +108,24 @@ class Exe(command: String) {
 
   def readLine(): String = synchronized {
     outputStream.get.readLine()
+  }
+
+  def readSExp(): String = {
+    var sb = new StringBuffer()
+    var pl = 0
+    var pr = 0
+    def processLine() = {
+      val line = readLine()
+      pl += line.count(_ == '(')
+      pr += line.count(_ == ')')
+      sb.append(line)
+    }
+    var first = true;
+    while (first || (pr == pr)) {
+      processLine()
+      first = false
+    }
+    sb.toString
   }
 
   def write(s: String): Unit = synchronized {

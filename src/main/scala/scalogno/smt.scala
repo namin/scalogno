@@ -4,12 +4,12 @@ import java.io._
 import scala.sys.process._
 import scala.collection._
 
-trait Smt extends InjectBase {
+trait Smt extends InjectBase with Engine {
   trait Z[+T]
   case class A[+T](x: Exp[T]) extends Z[T] {
     override def toString = {
-      val cs = cstore.collect{ case(IsTerm(id, k, _)) if x.id == id => k}.toList
-      if (cs.nonEmpty) cs.head else { addVar(x.id); "x"+x.id }
+      val cs = cstore.collect{ case(IsTerm(id, k, _)) if x.id == id => k}.toIterator
+      if (cs.hasNext) cs.next else { addVar(x.id); "x"+x.id }
     }
   }
   case class P[+T](s: String, args: List[Z[Any]]) extends Z[T] {
@@ -54,6 +54,14 @@ trait Smt extends InjectBase {
       case "unsat" => No
     }
   }
+  def purge(): Rel = {
+    val s = call_cvc4(state() ++ List("(check-sat)","(get-model)","(exit)"))
+    val lines = augmentString(s).lines
+    lines.next match {
+      case "sat" => println(s); Yes
+      case "unsat" => No
+    }
+  }
   def call_cvc4(lines: List[String]): String = {
     val ls = "(set-logic QF_UFDTLIAFS)" :: lines
     val out = new PrintWriter(new FileOutputStream("out.smt"))
@@ -62,8 +70,15 @@ trait Smt extends InjectBase {
     val s: String = ("cvc4 -m --lang smt out.smt").!!
     s.trim()
   }
+
+  override def run[T](f: Exp[T] => Rel): Seq[String] = {
+    super.run[T]{e => f(e) && purge()}
+  }
+  override def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
+    super.runN[T](max){e => f(e) && purge()}
+  }
 }
 
-object Play extends Smt with Engine {
+object Play extends Smt {
 
 }

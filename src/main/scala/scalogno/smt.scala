@@ -47,9 +47,7 @@ trait Smt extends InjectBase with Engine {
     check_sat(a) match {
       case "sat" => {
         val ms = getModel()
-        ms.foreach(register)
-        Yes ||
-          zAssert(P("or", ms.map{e => P("not", List(P("=", List(A(e.x), A(e.y)))))}))
+        withModel(ms) || withNegModel(ms)
       }
       case "unsat" => {
         smt.write("(pop)")
@@ -62,6 +60,13 @@ trait Smt extends InjectBase with Engine {
       call(check(P("assert", List(p))))(k)
     }
   }
+  def withModel(ms: List[IsEqual]): Rel = new Rel {
+    def exec(call: Exec)(k: Cont): Unit = {
+      call{ () => ms.foreach(register); Yes }(k)
+    }
+  }
+  def withNegModel(ms: List[IsEqual]): Rel =
+    zAssert(P("or", ms.map{e => P("not", List(P("=", List(A(e.x), A(e.y)))))}))
 
   implicit object InjectInt extends Inject[Int] {
     def toTerm(i: Int): Exp[Int] = term(i.toString,Nil)

@@ -60,7 +60,7 @@ trait NatBase extends InjectBase with Ordering {
 
 
 
-trait ListBase extends InjectBase with NatBase with Ordering {
+trait ListBase extends InjectBase with Ordering {
   implicit def injectPair[T:Inject,U:Inject] = new Inject[(T,U)] {
     def toTerm(x: (T,U)): Exp[(T,U)] = pair(x._1,x._2)
   }
@@ -342,7 +342,7 @@ trait STLC extends Base with InjectBase with ListBase with Engine {
     }
 }
 
-trait STLC_ReverseDeBruijn extends STLC {
+trait STLC_ReverseDeBruijn extends STLC with NatBase {
 
   // env is list of types, indexed by int
 

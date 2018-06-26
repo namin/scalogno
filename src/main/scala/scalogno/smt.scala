@@ -19,6 +19,44 @@ trait Smt extends InjectBase with Engine {
     wrap_init(super.run(f))
   override def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] =
     wrap_init(super.runN(max)(f))
+
+  trait Z[+T]
+  case class A[+T](x: Exp[T]) extends Z[T] {
+    override def toString = {
+      val cs = cstore.collect{ case(IsTerm(id, k, _)) if x.id == id => k}.toIterator
+      if (cs.hasNext) cs.next else { addVar(x.id); "x"+x.id }
+    }
+  }
+  case class P[+T](s: String, args: List[Z[Any]]) extends Z[T] {
+    override def toString = {
+      val a = args.mkString(" ")
+      s"($s $a)"
+    }
+  }
+  def addVar(id: Int) = {
+    smt.write(s"(declare-const x$id Int)")
+  }
+  def check(a: P[Unit])(): Rel = {
+    smt.write("(push)")
+    val r = a.toString
+    smt.write(r)
+    smt.write("(check-sat)")
+    smt.readLine() match {
+      case "sat" => {
+        Yes
+      }
+      case "unsat" => {
+        smt.write("(pop)")
+        No
+      }
+    }
+  }
+  def zAssert(p: P[Boolean]): Rel = new Rel {
+    def exec(call: Exec)(k: Cont): Unit = {
+      call(check(P("assert", List(p))))(k)
+    }
+  }
+
 }
 
 class Exe(command: String) {

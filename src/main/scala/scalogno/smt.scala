@@ -49,6 +49,7 @@ trait Smt extends InjectBase with Engine {
     def >(b: Z[Int]): Rel = zAssert(P(">", List(a, b)))
     def -(b: Z[Int]): Z[Int] = P("-", List(a, b))
     def *(b: Z[Int]): Z[Int] = P("*", List(a, b))
+    def +(b: Z[Int]): Z[Int] = P("+", List(a, b))
   }
   def check_sat(): Rel = {
     val s = call_cvc4(state() ++ List("(check-sat)","(exit)"))

@@ -135,6 +135,7 @@ class Exe(command: String) {
 
   def write(s: String): Unit = synchronized {
     inputStream.get.write((s + "\n").getBytes)
+    inputStream.get.flush()
   }
 
   def close(): Unit = {

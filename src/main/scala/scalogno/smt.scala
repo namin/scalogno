@@ -36,15 +36,20 @@ trait Smt extends InjectBase with Engine {
   def addVar(id: Int) = {
     smt.write(s"(declare-const x$id Int)")
   }
-  def check(a: P[Unit])(): Rel = {
+  def check_sat(a: P[Unit]): String = {
     smt.write("(push)")
     val r = a.toString
     smt.write(r)
     smt.write("(check-sat)")
-    smt.readLine() match {
+    smt.readLine()
+  }
+  def check(a: P[Unit])(): Rel = {
+    check_sat(a) match {
       case "sat" => {
-        getModel().foreach(register)
-        Yes
+        val ms = getModel()
+        ms.foreach(register)
+        Yes ||
+          zAssert(P("or", ms.map{e => P("not", List(P("=", List(A(e.x), A(e.y)))))}))
       }
       case "unsat" => {
         smt.write("(pop)")

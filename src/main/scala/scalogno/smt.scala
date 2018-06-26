@@ -81,7 +81,7 @@ trait Smt extends InjectBase with Engine {
     cs
   }
   def call_cvc4(lines: List[String]): String = {
-    val ls = "(set-logic QF_UFDTLIAFS)" :: lines
+    val ls = "(set-logic ALL_SUPPORTED)" :: lines
     val out = new PrintWriter(new FileOutputStream("out.smt"))
     for (l <- ls) out.println(l)
     out.close()

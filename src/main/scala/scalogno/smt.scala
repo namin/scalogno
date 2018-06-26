@@ -4,7 +4,7 @@ trait Smt extends InjectBase with Engine {
   var smt: Exe = _
   def smt_init() = {
     smt = new Exe("cvc4 --interactive --lang smt")
-    smt.skipLines(24)
+    smt.skipHeader()
     smt.write("(set-logic ALL_SUPPORTED)")
   }
   def wrap_init[A](a: => A): A = {
@@ -41,13 +41,12 @@ trait Smt extends InjectBase with Engine {
     val r = a.toString
     smt.write(r)
     smt.write("(check-sat)")
-    if (smt.readLine().endsWith("unsat")) "unsat" else "sat"
+    smt.readAtom()
   }
   def check(a: P[Unit])(): Rel = {
     check_sat(a) match {
       case "sat" => {
         val ms = getModel()
-        smt.write("(pop)") // should only pop on neg?
         withModel(ms) || withNegModel(ms)
       }
       case "unsat" => {
@@ -113,12 +112,16 @@ class Exe(command: String) {
       stdout => outputStream.put(new BufferedReader(new InputStreamReader(stdout))),
       stderr => Source.fromInputStream(stderr).getLines.foreach(println)));
 
-  def skipLines(n: Int) = synchronized {
-    (0 until n).foreach{_ => readLine()}
+  def skipHeader() = synchronized {
+    (0 until 24/*brittle magic*/).foreach{_ => readLine()}
   }
 
   def readLine(): String = synchronized {
     outputStream.get.readLine()
+  }
+
+  def readAtom(): String = synchronized {
+    readLine().replaceAll("CVC4> ", "")/*brittle magic*/
   }
 
   def readSExp(): String = synchronized {

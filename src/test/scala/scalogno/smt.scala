@@ -2,8 +2,18 @@ package scalogno
 
 import org.scalatest._
 
-class TestSmt extends MySuite with Smt {
+class TestExe extends MySuite with Smt {
   test("1") {
+    smt_init()
+    smt.write("(assert (= 1 0))")
+    smt.write("(check-sat)")
+    expectResult("unsat") { smt.readAtom() }
+    smt.close()
+  }
+}
+
+class TestSmt extends MySuite with Smt {
+  ignore("1") {
     expectResult(List("1")) {
       run[Int] { q =>
         q ==? 1
@@ -24,7 +34,7 @@ class TestFactorial extends MySuite with Smt {
       }
     )
 
-  test("7") {
+  ignore("7") {
     expectResult(List("1", "1", "2", "6", "24", "120", "720")) {
       runN[Int](7){ o => exists[Int]{n => faco(n,o)} }
     }
@@ -45,7 +55,7 @@ class TestFib extends MySuite with Smt /*with ListBase with TablingBase with Tab
 
   }
 
-  test("6") {
+  ignore("6") {
     expectResult(List("1", "2", "3", "5", "8", "13")) {
       runN[Int](6){ o => exists[Int]{n => fibo(n,o)} }
     }

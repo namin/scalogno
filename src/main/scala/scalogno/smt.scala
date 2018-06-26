@@ -41,7 +41,7 @@ trait Smt extends InjectBase with Engine {
     val r = a.toString
     smt.write(r)
     smt.write("(check-sat)")
-    smt.readLine()
+    if (smt.readLine().endsWith("unsat")) "unsat" else "sat"
   }
   def check(a: P[Unit])(): Rel = {
     check_sat(a) match {
@@ -113,7 +113,7 @@ class Exe(command: String) {
       stdout => outputStream.put(new BufferedReader(new InputStreamReader(stdout))),
       stderr => Source.fromInputStream(stderr).getLines.foreach(println)));
 
-  def skipLines(n: Int) = {
+  def skipLines(n: Int) = synchronized {
     (0 until n).foreach{_ => readLine()}
   }
 
@@ -121,7 +121,7 @@ class Exe(command: String) {
     outputStream.get.readLine()
   }
 
-  def readSExp(): String = {
+  def readSExp(): String = synchronized {
     var sb = new StringBuffer()
     var pl = 0
     var pr = 0
@@ -140,7 +140,7 @@ class Exe(command: String) {
   }
 
   def write(s: String): Unit = synchronized {
-    inputStream.get.write((s + "\n").getBytes)
+    inputStream.get.write((s + "\n\n").getBytes)
     inputStream.get.flush()
   }
 

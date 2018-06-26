@@ -2,16 +2,19 @@ package scalogno
 
 import org.scalatest._
 
+trait Smt extends Base with Engine
+
 class TestExe extends MySuite with Smt {
   test("1") {
-    smt_init()
-    smt.write("(assert (= 1 0))")
-    smt.write("(check-sat)")
-    expectResult("unsat") { smt.readAtom() }
-    smt.close()
+    solver.init()
+    solver.smt.write("(assert (= 1 0))")
+    solver.smt.write("(check-sat)")
+    expectResult("unsat") { solver.smt.readAtom() }
+    solver.smt.close()
   }
 }
 
+/* TODO
 class TestSmt extends MySuite with Smt {
   ignore("1") {
     expectResult(List("1")) {
@@ -61,3 +64,4 @@ class TestFib extends MySuite with Smt /*with ListBase with TablingBase with Tab
     }
   }
 }
+*/

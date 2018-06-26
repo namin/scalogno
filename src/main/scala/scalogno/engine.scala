@@ -3,6 +3,9 @@ package scalogno
 import scala.collection._
 
 trait Base {
+val solver = new SmtSolver
+solver.init()
+
 val Backtrack = new Exception
 
 var varCount: Int = 0
@@ -121,6 +124,8 @@ def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
 
   val cn = cs flatMap { c2 => prop(c, c2)(fail) }
   cstore += c
+  solver.add(c)
+  if (!solver.checkSat()) fail()
   cn foreach register
   false
 }
@@ -137,6 +142,7 @@ def run[T](f: Exp[T] => Rel): Seq[String] = {
   def call(e: () => Rel)(k: Cont): Unit = {
     val cstore1 = cstore
     val dvars1 = dvars
+    solver.push()
     try {
       e().exec(call)(k)
     } catch {
@@ -144,11 +150,13 @@ def run[T](f: Exp[T] => Rel): Seq[String] = {
     } finally {
       cstore = cstore1
       dvars = dvars1
+      solver.pop()
     }
   }
   val q = fresh[T]
   val res = mutable.ListBuffer[String]()
   call(() => f(q)) { () =>
+    solver.extractModel()
     res += extractStr(q)
   }
   res.toList
@@ -158,6 +166,7 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
   def call(e: () => Rel)(k: Cont): Unit = {
     val cstore1 = cstore
     val dvars1 = dvars
+    solver.push()
     try {
       e().exec(call)(k)
     } catch {
@@ -165,6 +174,7 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
     } finally {
       cstore = cstore1
       dvars = dvars1
+      solver.pop()
     }
   }
   val q = fresh[T]
@@ -172,6 +182,7 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
   val Done = new Exception
   try {
   call(() => f(q)) { () =>
+    solver.extractModel()
     res += extractStr(q)
     if (res.length>=max) throw Done
   }

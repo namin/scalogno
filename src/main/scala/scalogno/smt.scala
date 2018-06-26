@@ -19,14 +19,16 @@ trait Smt extends InjectBase with Engine {
     }
   }
   val zs = DVar[List[P[Any]]](Nil)
-
+  val ps = DVar[List[List[IsEqual]]](Nil)
   val used_vars0 = immutable.ListSet[Int]()
   var used_vars: immutable.Set[Int] = used_vars0
   def addVar(id: Int) = used_vars += id
-  def state() = {
+  def state(): List[String] = {
     used_vars = used_vars0
-    val r = zs().map(_.toString)
-    used_vars.toList.map({i => s"(declare-const x$i Int)"}) ++ r
+    val r1: List[String] = zs().map(_.toString)
+    val r2: List[String] =
+      for (cs <- ps();  e <- cs) yield P("assert", List(P("not", List(P("=", List(A(e.x), A(e.y))))))).toString
+    used_vars.toList.map({i => s"(declare-const x$i Int)"}) ++ r1 ++ r2
   }
   def zAssert(p: P[Boolean]): Rel = new Rel {
     def exec(call: Exec)(k: Cont): Unit = {
@@ -42,7 +44,8 @@ trait Smt extends InjectBase with Engine {
   implicit def toZInt(e: Exp[Int]): Z[Int] = A(e)
   implicit def toZIntOps(e: Exp[Int]) = ZIntOps(A(e))
   implicit class ZIntOps(a: Z[Int]) {
-    def =?=(b: Z[Int]): Rel = zAssert(P("=", List(a, b)))
+    def ==?(b: Z[Int]): Rel = zAssert(P("=", List(a, b)))
+    def !=?(b: Z[Int]): Rel = zAssert(P("not", List(P("=", List(a, b)))))
     def >(b: Z[Int]): Rel = zAssert(P(">", List(a, b)))
     def -(b: Z[Int]): Z[Int] = P("-", List(a, b))
     def *(b: Z[Int]): Z[Int] = P("*", List(a, b))
@@ -58,9 +61,24 @@ trait Smt extends InjectBase with Engine {
     val s = call_cvc4(state() ++ List("(check-sat)","(get-model)","(exit)"))
     val lines = augmentString(s).lines
     lines.next match {
-      case "sat" => println(s); Yes
+      case "sat" => {
+        val cs = getModel(s)
+
+        {cs.foreach(register); Yes} ||
+        {ps := cs::ps(); purge()}
+      }
       case "unsat" => No
     }
+  }
+  def getModel(s: String): List[IsEqual] = {
+    val p = raw"\(define-fun x([0-9]+) \(\) Int ([0-9]+)\)".r
+    val cs = (for (m <- p.findAllMatchIn(s)) yield {
+      val id = m.group(1).toInt
+      val v = m.group(2).toInt
+      val e = IsEqual(Exp(id), v)
+      e
+    }).toList
+    cs
   }
   def call_cvc4(lines: List[String]): String = {
     val ls = "(set-logic QF_UFDTLIAFS)" :: lines

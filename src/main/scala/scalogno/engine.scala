@@ -129,32 +129,21 @@ def register(c: Constraint): Unit = {
   if (cstore.contains(c)) return
   if (conflict(cstore,c)) throw Backtrack
 }
-
-type Thread = immutable.Map[String,Any]
-var thread: Thread = Map.empty
-def thread_save() = {
-  thread = Map.empty
-  thread += ("cstore" -> cstore)
-  thread += ("dvars" -> dvars)
-  thread
-}
-def thread_restore(thread: Thread) = {
-  cstore = thread("cstore").asInstanceOf[immutable.Set[Constraint]]
-  dvars = thread("dvars").asInstanceOf[immutable.Map[Int, Any]]
-}
 }
 
 trait Engine extends Base {
 // execution (depth-first)
 def run[T](f: Exp[T] => Rel): Seq[String] = {
   def call(e: () => Rel)(k: Cont): Unit = {
-    val thread = thread_save()
+    val cstore1 = cstore
+    val dvars1 = dvars
     try {
       e().exec(call)(k)
     } catch {
       case Backtrack => // OK
     } finally {
-      thread_restore(thread)
+      cstore = cstore1
+      dvars = dvars1
     }
   }
   val q = fresh[T]

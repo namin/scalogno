@@ -18,33 +18,21 @@ trait Smt extends InjectBase with Engine {
       s"($s $a)"
     }
   }
-
-  var zs: List[P[Any]] = Nil
-  var ps: List[List[IsEqual]] = Nil
-  override def thread_save() = {
-    super.thread_save()
-    thread += ("zs" -> zs)
-    thread += ("ps" -> ps)
-    thread
-  }
-  override def thread_restore(thread: Thread) = {
-    super.thread_restore(thread)
-    zs = thread("zs").asInstanceOf[List[P[Any]]]
-    ps = thread("ps").asInstanceOf[List[List[IsEqual]]]
-  }
+  val zs = DVar[List[P[Any]]](Nil)
+  val ps = DVar[List[List[IsEqual]]](Nil)
   val used_vars0 = immutable.ListSet[Int]()
   var used_vars: immutable.Set[Int] = used_vars0
   def addVar(id: Int) = used_vars += id
   def state(): List[String] = {
     used_vars = used_vars0
-    val r1: List[String] = zs.map(_.toString)
+    val r1: List[String] = zs().map(_.toString)
     val r2: List[String] =
-      for (cs <- ps;  e <- cs) yield P("assert", List(P("not", List(P("=", List(A(e.x), A(e.y))))))).toString
+      for (cs <- ps();  e <- cs) yield P("assert", List(P("not", List(P("=", List(A(e.x), A(e.y))))))).toString
     used_vars.toList.map({i => s"(declare-const x$i Int)"}) ++ r1 ++ r2
   }
   def zAssert(p: P[Boolean]): Rel = new Rel {
     def exec(call: Exec)(k: Cont): Unit = {
-      zs = zs ++ List(P("assert", List(p)))
+      zs := zs() ++ List(P("assert", List(p)))
       call(check_sat)(k)
     }
   }
@@ -78,7 +66,7 @@ trait Smt extends InjectBase with Engine {
         val cs = getModel(s)
 
         {cs.foreach(register); Yes} ||
-        {ps = cs::ps; purge()}
+        {ps := cs::ps(); purge()}
       }
       case "unsat" => No
     }

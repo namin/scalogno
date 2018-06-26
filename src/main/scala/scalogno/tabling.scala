@@ -13,10 +13,10 @@ trait TablingBase extends Base with Engine {
 
 trait TablingImpl extends TablingBase {
 type Answer = (Exp[Any] => Unit)
-case class Call(key: String, goal1: Exp[Any], thread1: Thread, ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
+case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
   def load(ans: Answer): Unit = {
     // reset state to state at call
-    thread_restore(thread1)
+    cstore = cstore1; dvars = dvars1
     // equate actual state with symbolic before state
     dvarsEqu(ldvars0)
     // load constraints from answer
@@ -48,7 +48,7 @@ def makeCall(goal0: Exp[Any], k: Cont): Call = {
 
   // but disregard state for memoization (compute key for goal0)
   val key = extractStr(goal0)
-  val cont = Call(key,goal,thread_save(),ldvars0,ldvars1,k)
+  val cont = Call(key,goal,cstore,dvars,ldvars0,ldvars1,k)
   contTable(key) = cont::contTable.getOrElse(key,Nil)
   cont
 }

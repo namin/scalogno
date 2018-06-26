@@ -1,9 +1,9 @@
 name := "scalogno"
 
-version := "0.2"
+version := "0.3"
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.6"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % "test"
 
 parallelExecution in Test := false

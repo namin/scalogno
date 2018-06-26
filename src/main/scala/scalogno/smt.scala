@@ -47,6 +47,7 @@ trait Smt extends InjectBase with Engine {
     check_sat(a) match {
       case "sat" => {
         val ms = getModel()
+        smt.write("(pop)") // should only pop on neg?
         withModel(ms) || withNegModel(ms)
       }
       case "unsat" => {

@@ -80,6 +80,7 @@ trait Smt extends Base with InjectBase {
     def ==?(b: Z[Int]): Rel = zAssert(P("=", List(a, b)))
     def !=?(b: Z[Int]): Rel = zAssert(P("not", List(P("=", List(a, b)))))
     def >(b: Z[Int]): Rel = zAssert(P(">", List(a, b)))
+    def >=(b: Z[Int]): Rel = zAssert(P(">=", List(a, b)))
     def -(b: Z[Int]): Z[Int] = P("-", List(a, b))
     def *(b: Z[Int]): Z[Int] = P("*", List(a, b))
     def +(b: Z[Int]): Z[Int] = P("+", List(a, b))
@@ -107,12 +108,13 @@ trait Smt extends Base with InjectBase {
         if (solver.checkSat()) {
           val cs = extractModel()
           val es = cs.map{e => P("=", List(A(e.x), A(e.y)))}
+          val ns = P("assert", List(P("not", List(P("and", es))))).toString
           call{() =>
             es.foreach{(c: P[Boolean]) => solver.add(P("assert", List(c)).toString)}
             cs.foreach(register);
             Yes
           }(k)
-          iter(P("assert", List(P("not", List(P("and", es))))).toString)
+          iter(ns)
         } else {
           throw Backtrack
         }

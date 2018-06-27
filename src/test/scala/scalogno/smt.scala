@@ -2,9 +2,7 @@ package scalogno
 
 import org.scalatest._
 
-trait Smt extends Base with Engine
-
-class TestExe extends MySuite with Smt {
+class TestExe extends MySuite with Engine {
   test("1") {
     solver.init()
     solver.smt.write("(assert (= 1 0))")
@@ -14,9 +12,23 @@ class TestExe extends MySuite with Smt {
   }
 }
 
-/* TODO
-class TestSmt extends MySuite with Smt {
-  ignore("1") {
+class TestSmt extends MySuite with Smt with Engine {
+  test("0") {
+    expectResult(Nil) {
+      run[Int] { q =>
+        A(0) ==? A(1)
+      }
+    }
+  }
+  test("1") {
+    expectResult(Nil) {
+      run[Int] { q =>
+        q ==? 1 &&
+        q ==? 0
+      }
+    }
+  }
+  ignore("2") {
     expectResult(List("1")) {
       run[Int] { q =>
         q ==? 1
@@ -25,6 +37,7 @@ class TestSmt extends MySuite with Smt {
   }
 }
 
+/*
 class TestFactorial extends MySuite with Smt {
   def faco(n: Exp[Int], o: Exp[Int]): Rel =
     (

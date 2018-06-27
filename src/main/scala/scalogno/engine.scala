@@ -124,8 +124,8 @@ def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
 
   val cn = cs flatMap { c2 => prop(c, c2)(fail) }
   cstore += c
-  solver.add(c)
-  if (!solver.checkSat()) fail()
+  //solver.add(c)
+  //if (!solver.checkSat()) fail()
   cn foreach register
   false
 }

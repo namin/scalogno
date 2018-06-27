@@ -1,5 +1,7 @@
 package scalogno
 
+import scala.collection._
+
 class SmtSolver {
   var smt: Exe = _
   def init() = {
@@ -8,10 +10,62 @@ class SmtSolver {
     smt.write("(set-logic ALL_SUPPORTED)")
   }
   def add(c: Any): Unit = {} // TODO
-  def checkSat(): Boolean = true // TODO
+  def checkSat(): Boolean = {
+    smt.write("(check-sat)")
+    smt.readAtom() match {
+      case "sat" => true
+      case "unsat" => false
+      case debug => println("smt gives "+debug); true
+    }
+  }
   def push(): Unit = smt.write("(push)")
   def pop(): Unit = smt.write("(pop)")
   def extractModel(): Unit = {} // TODO
+}
+
+trait Smt extends Base with InjectBase {
+  abstract class Z[+T]
+  case class A[+T](x: Exp[T]) extends Z[T] {
+    override def toString = {
+      val cs = cstore.collect{ case(IsTerm(id, k, _)) if x.id == id => k}.toIterator
+      if (cs.hasNext) cs.next else { addVar(x.id); "x"+x.id }
+    }
+  }
+  case class P[+T](s: String, args: List[Z[Any]]) extends Z[T] {
+    override def toString = {
+      val a = args.mkString(" ")
+      s"($s $a)"
+    }
+  }
+
+  implicit object InjectInt extends Inject[Int] {
+    def toTerm(i: Int): Exp[Int] = term(i.toString,Nil)
+  }
+  implicit def int2ZInt(e: Int): Z[Int] = toZInt(InjectInt.toTerm(e))
+  implicit def toZInt(e: Exp[Int]): Z[Int] = A(e)
+  implicit def toZIntOps(e: Exp[Int]) = ZIntOps(A(e))
+  implicit class ZIntOps(a: Z[Int]) {
+    def ==?(b: Z[Int]): Rel = zAssert(P("=", List(a, b)))
+    def !=?(b: Z[Int]): Rel = zAssert(P("not", List(P("=", List(a, b)))))
+    def >(b: Z[Int]): Rel = zAssert(P(">", List(a, b)))
+    def -(b: Z[Int]): Z[Int] = P("-", List(a, b))
+    def *(b: Z[Int]): Z[Int] = P("*", List(a, b))
+    def +(b: Z[Int]): Z[Int] = P("+", List(a, b))
+  }
+
+  def zAssert(p: P[Boolean]): Rel = {
+    val c = P("assert", List(p)).toString
+    solver.smt.write(c)
+    if (solver.checkSat()) Yes else throw Backtrack
+  }
+  val seenvars0 = immutable.ListSet[Int]()
+  var seenvars: immutable.Set[Int] = seenvars0
+  def addVar(id: Int) = {
+    if (!seenvars.contains(id)) {
+      seenvars += id
+      solver.smt.write(s"(declare-const x$id Int)")
+    }
+  }
 }
 
 class Exe(command: String) {
@@ -61,6 +115,7 @@ class Exe(command: String) {
   }
 
   def write(s: String): Unit = synchronized {
+    println("smt: "+s)
     inputStream.get.write((s + "\n\n").getBytes)
     inputStream.get.flush()
   }
@@ -71,4 +126,4 @@ class Exe(command: String) {
   }
 }
 
-object Play extends Base with Engine
+object Play extends Smt with Engine

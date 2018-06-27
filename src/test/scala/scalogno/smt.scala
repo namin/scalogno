@@ -85,9 +85,9 @@ class TestFactorial extends MySuite with Smt with Engine {
     }
   }
 
-  test("only 7") {
+  test("only 6") {
     expectResult(List("720")) {
-      runN[Int](7){ o => faco(7,o) }
+      runN[Int](6){ o => faco(6,o) }
     }
   }
 }

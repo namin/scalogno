@@ -66,8 +66,7 @@ class TestSmt extends MySuite with Smt with Engine {
   }
 }
 
-/*
-class TestFactorial extends MySuite with Smt {
+class TestFactorial extends MySuite with Smt with Engine {
   def faco(n: Exp[Int], o: Exp[Int]): Rel =
     (
       (n ==? 0) && (o ==? 1) ||
@@ -86,7 +85,7 @@ class TestFactorial extends MySuite with Smt {
   }
 }
 
-class TestFib extends MySuite with Smt /*with ListBase with TablingBase with TablingImpl*/ {
+class TestFib extends MySuite with Smt with Engine/*with ListBase with TablingBase with TablingImpl*/ {
   def fibo(n: Exp[Int], o: Exp[Int]): Rel = /*memo(term("fibo", List(n,o)))*/ {
     ((n ==? 0) && (o ==? 1)) ||
     ((n ==? 1) && (o ==? 2)) ||
@@ -106,4 +105,3 @@ class TestFib extends MySuite with Smt /*with ListBase with TablingBase with Tab
     }
   }
 }
-*/

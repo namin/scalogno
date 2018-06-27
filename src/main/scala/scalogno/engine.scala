@@ -156,7 +156,7 @@ def run[T](f: Exp[T] => Rel): Seq[String] = {
   val q = fresh[T]
   val res = mutable.ListBuffer[String]()
   call(() => f(q)) { () =>
-    solver.extractModel()
+    extractModel()
     res += extractStr(q)
   }
   res.toList
@@ -182,13 +182,17 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
   val Done = new Exception
   try {
   call(() => f(q)) { () =>
-    solver.extractModel()
+    extractModel()
     res += extractStr(q)
     if (res.length>=max) throw Done
   }
   } catch { case Done => }
   res.toList
 }
+
+  def extractModel() = {
+    solver.extractModel({(x,v) => register(IsEqual(Exp(x),term(v.toString, Nil)))})
+  }
 
   // def extractStr(x: Exp[Any]): String
 

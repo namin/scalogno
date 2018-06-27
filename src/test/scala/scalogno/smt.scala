@@ -10,6 +10,35 @@ class TestExe extends MySuite with Engine {
     expectResult("unsat") { solver.smt.readAtom() }
     solver.smt.close()
   }
+
+  test("2debug") {
+    solver.init()
+    solver.smt.write("(declare-const x0 Int)")
+    solver.smt.write("(assert (= 1 x0))")
+    solver.smt.write("(check-sat)")
+    expectResult("sat") { solver.smt.readAtom() }
+    solver.smt.write("(get-model)")
+    val s = solver.smt.readSExp()
+    //println(s)
+    val p = raw"\(define-fun x([0-9]+) \(\) Int ([0-9]+)\)".r
+    for (m <- p.findAllMatchIn(s)) {
+      val id = m.group(1).toInt
+      val v = m.group(2).toInt
+      //println(s"$id has $v")
+    }
+  }
+
+  test("2") {
+    solver.init()
+    solver.smt.write("(declare-const x0 Int)")
+    solver.smt.write("(assert (= 1 x0))")
+    solver.smt.write("(check-sat)")
+    expectResult("sat") { solver.smt.readAtom() }
+    var ms: List[(Int,Int)] = Nil
+    solver.extractModel((k,v) => ms = (k,v)::ms)
+    expectResult(List((0,1)))(ms)
+    solver.smt.close()
+  }
 }
 
 class TestSmt extends MySuite with Smt with Engine {
@@ -28,7 +57,7 @@ class TestSmt extends MySuite with Smt with Engine {
       }
     }
   }
-  ignore("2") {
+  test("2") {
     expectResult(List("1")) {
       run[Int] { q =>
         q ==? 1

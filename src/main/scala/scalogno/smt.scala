@@ -5,7 +5,7 @@ import scala.collection._
 class SmtSolver {
   var smt: Exe = _
   def init() = {
-    smt = new Exe("cvc4 --interactive --lang smt")
+    smt = new Exe("cvc4 -m --interactive --lang smt")
     smt.skipHeader()
     smt.write("(set-logic ALL_SUPPORTED)")
   }
@@ -20,7 +20,16 @@ class SmtSolver {
   }
   def push(): Unit = smt.write("(push)")
   def pop(): Unit = smt.write("(pop)")
-  def extractModel(): Unit = {} // TODO
+  def extractModel(f: (Int,Int) => Unit): Unit = {
+    smt.write("(get-model)")
+    val s = smt.readSExp()
+    val p = raw"\(define-fun x([0-9]+) \(\) Int ([0-9]+)\)".r
+    for (m <- p.findAllMatchIn(s)) {
+      val id = m.group(1).toInt
+      val v = m.group(2).toInt
+      f(id, v)
+    }
+  }
 }
 
 trait Smt extends Base with InjectBase {
@@ -105,9 +114,10 @@ class Exe(command: String) {
       pl += line.count(_ == '(')
       pr += line.count(_ == ')')
       sb.append(line)
+      sb.append(" ")
     }
     var first = true;
-    while (first || (pr == pr)) {
+    while (first || (pl != pr)) {
       processLine()
       first = false
     }

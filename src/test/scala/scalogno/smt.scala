@@ -83,6 +83,12 @@ class TestFactorial extends MySuite with Smt with Engine {
       runN[Int](7){ o => exists[Int]{n => faco(n,o)} }
     }
   }
+
+  ignore("only 7") {
+    expectResult(List("720")) {
+      runN[Int](7){ o => faco(7,o) }
+    }
+  }
 }
 
 class TestFib extends MySuite with Smt with Engine with ListBase with TablingBase with TablingImpl {

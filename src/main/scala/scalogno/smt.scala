@@ -9,7 +9,6 @@ class SmtSolver {
     smt.skipHeader()
     smt.write("(set-logic ALL_SUPPORTED)")
   }
-  def add(c: Any): Unit = {} // TODO
   def checkSat(): Boolean = {
     smt.write("(check-sat)")
     smt.readAtom() match {
@@ -39,7 +38,10 @@ class SmtSolver {
     }
     scopes += (id -> scope)
   }
-  def add(c: String): Unit = smt.write(c)
+  def add(c: String): Unit = {
+    print(scope.toString+" ")
+    smt.write(c)
+  }
   def extractModel(f: (Int,Int) => Unit): Unit = {
     smt.write("(get-model)")
     val s = smt.readSExp()

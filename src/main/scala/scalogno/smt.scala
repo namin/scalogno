@@ -15,7 +15,7 @@ class SmtSolver {
     smt.readAtom() match {
       case "sat" => true
       case "unsat" => false
-      case debug => println("smt gives "+debug); true
+      //case debug => println("smt gives "+debug); true
     }
   }
   def push(): Unit = smt.write("(push)")

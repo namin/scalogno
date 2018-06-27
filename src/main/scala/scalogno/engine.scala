@@ -125,8 +125,11 @@ def conflict(cs: Set[Constraint], c: Constraint): Boolean = {
 
   val cn = cs flatMap { c2 => prop(c, c2)(fail) }
   cstore += c
-  //solver.add(c)
-  //if (!solver.checkSat()) fail()
+
+  // assertions are handled separately in SMT
+  // solver.add(c)
+  // if (!solver.checkSat()) fail()
+
   cn foreach register
   false
 }
@@ -138,6 +141,13 @@ def register(c: Constraint): Unit = {
 }
 
 trait Engine extends Base {
+  def extractModel(): Unit = {
+    var cs: List[IsEqual] = Nil
+    solver.extractModel({(x,v) =>
+      register(IsEqual(Exp(x),term(v.toString, Nil)))
+    })
+  }
+
 // execution (depth-first)
 def run[T](f: Exp[T] => Rel): Seq[String] = {
   def call(e: () => Rel)(k: Cont): Unit = {
@@ -157,7 +167,7 @@ def run[T](f: Exp[T] => Rel): Seq[String] = {
   val q = fresh[T]
   val res = mutable.ListBuffer[String]()
   call(() => f(q)) { () =>
-    //extractModel()
+    extractModel()
     res += extractStr(q)
   }
   res.toList
@@ -183,7 +193,7 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
   val Done = new Exception
   try {
   call(() => f(q)) { () =>
-    //extractModel()
+    extractModel()
     res += extractStr(q)
     if (res.length>=max) throw Done
   }

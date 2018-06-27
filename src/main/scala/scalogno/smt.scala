@@ -23,6 +23,7 @@ class SmtSolver {
     smt.write("(push)")
   }
   def pop(): Unit = {
+    scopes = scopes.collect{case (k,v) if v < scope => (k,v)}.toMap
     scope -= 1
     smt.write("(pop)")
   }
@@ -31,12 +32,13 @@ class SmtSolver {
     scopes.get(id) match {
       case None =>
         smt.write(s"(declare-const x$id Int)")
+        scopes += (id -> scope)
       case Some(s) =>
         if (s >= scope) {
           smt.write(s"(declare-const x$id Int)")
+          scopes += (id -> scope)
         }
     }
-    scopes += (id -> scope)
   }
   def add(c: String): Unit = {
     print(scope.toString+" ")
@@ -86,42 +88,16 @@ trait Smt extends Base with InjectBase {
     def +(b: Z[Int]): Z[Int] = P("+", List(a, b))
   }
 
-  def extractModel(): List[IsEqual] = {
-    var cs: List[IsEqual] = Nil
-    solver.extractModel({(x,v) =>
-      val c = IsEqual(Exp(x),term(v.toString, Nil))
-      cs = c::cs
-    })
-    cs
-  }
-
   val seenvars0: immutable.Set[Int] = immutable.Set.empty
   var seenvars = seenvars0
   def addVar(id: Int) = { seenvars += id }
-  def zAssert(p: P[Boolean]): Rel = new Rel {
-    def exec(call: Exec)(k: Cont) = {
-      seenvars = seenvars0
-      val c = P("assert", List(p)).toString
-      seenvars.foreach{solver.decl}
-      def iter(c: String): Rel = {
-        solver.add(c)
-        if (solver.checkSat()) {
-          val cs = extractModel()
-          val es = cs.map{e => P("=", List(A(e.x), A(e.y)))}
-          val ns = P("assert", List(P("not", List(P("and", es))))).toString
-          call{() =>
-            es.foreach{(c: P[Boolean]) => solver.add(P("assert", List(c)).toString)}
-            cs.foreach(register);
-            Yes
-          }(k)
-          iter(ns)
-        } else {
-          throw Backtrack
-        }
-      }
-      iter(c)
-    }
-
+  def zAssert(p: P[Boolean]): Rel = {
+    seenvars = seenvars0
+    val c = P("assert", List(p)).toString
+    seenvars.foreach{solver.decl}
+    solver.add(c)
+    if (!solver.checkSat()) throw Backtrack
+    Yes
   }
 }
 

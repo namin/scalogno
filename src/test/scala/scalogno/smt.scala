@@ -64,19 +64,11 @@ class TestSmt extends MySuite with Smt with Engine {
       }
     }
   }
-  /*
-  test("3") {
-    expectResult(List("1", "2", "3")) {
-      runN[Int](2) { q =>
-        exists[Int]{ n => q >= 0 && n >= 0 && A(3) >= n && q ==? (n + 1) }
-      }
-    }
-  }
-  */
 }
 
 class TestFactorial extends MySuite with Smt with Engine {
   def faco(n: Exp[Int], o: Exp[Int]): Rel =
+    (n >= 0) &&
     (
       (n ==? 0) && (o ==? 1) ||
 
@@ -93,7 +85,7 @@ class TestFactorial extends MySuite with Smt with Engine {
     }
   }
 
-  ignore("only 7") {
+  test("only 7") {
     expectResult(List("720")) {
       runN[Int](7){ o => faco(7,o) }
     }

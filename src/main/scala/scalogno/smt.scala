@@ -20,6 +20,7 @@ class SmtSolver {
   }
   def push(): Unit = smt.write("(push)")
   def pop(): Unit = smt.write("(pop)")
+  def decl(id: Int): Unit = smt.write(s"(declare-const x$id Int)")
   def extractModel(f: (Int,Int) => Unit): Unit = {
     smt.write("(get-model)")
     val s = smt.readSExp()
@@ -37,7 +38,7 @@ trait Smt extends Base with InjectBase {
   case class A[+T](x: Exp[T]) extends Z[T] {
     override def toString = {
       val cs = cstore.collect{ case(IsTerm(id, k, _)) if x.id == id => k}.toIterator
-      if (cs.hasNext) cs.next else { addVar(x.id); "x"+x.id }
+      if (cs.hasNext) cs.next else { "x"+x.id }
     }
   }
   case class P[+T](s: String, args: List[Z[Any]]) extends Z[T] {
@@ -62,17 +63,29 @@ trait Smt extends Base with InjectBase {
     def +(b: Z[Int]): Z[Int] = P("+", List(a, b))
   }
 
+  def extractModel(): List[IsEqual] = {
+    var cs: List[IsEqual] = Nil
+    solver.extractModel({(x,v) =>
+      val c = IsEqual(Exp(x),term(v.toString, Nil))
+      register(c)
+      cs = c::cs
+    })
+    cs
+  }
+
   def zAssert(p: P[Boolean]): Rel = {
     val c = P("assert", List(p)).toString
+    println("c: "+c)
     solver.smt.write(c)
-    if (solver.checkSat()) Yes else throw Backtrack
-  }
-  val seenvars0 = immutable.ListSet[Int]()
-  var seenvars: immutable.Set[Int] = seenvars0
-  def addVar(id: Int) = {
-    if (!seenvars.contains(id)) {
-      seenvars += id
-      solver.smt.write(s"(declare-const x$id Int)")
+    if (solver.checkSat()) {
+      //solver.push()
+      val cs = extractModel()
+      Yes || {
+        //solver.pop()
+        zAssert(P("not", List(P("and", cs.map({e => P("=", List(A(e.x), A(e.y)))})))))
+      }
+    } else {
+      throw Backtrack
     }
   }
 }

@@ -10,7 +10,8 @@ val Backtrack = new Exception
 
 var varCount: Int = 0
 def freshId = {
-  var id = varCount
+  val id = varCount
+  solver.decl(id)
   varCount += 1
   id
 }
@@ -156,7 +157,7 @@ def run[T](f: Exp[T] => Rel): Seq[String] = {
   val q = fresh[T]
   val res = mutable.ListBuffer[String]()
   call(() => f(q)) { () =>
-    extractModel()
+    //extractModel()
     res += extractStr(q)
   }
   res.toList
@@ -182,17 +183,13 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
   val Done = new Exception
   try {
   call(() => f(q)) { () =>
-    extractModel()
+    //extractModel()
     res += extractStr(q)
     if (res.length>=max) throw Done
   }
   } catch { case Done => }
   res.toList
 }
-
-  def extractModel() = {
-    solver.extractModel({(x,v) => register(IsEqual(Exp(x),term(v.toString, Nil)))})
-  }
 
   // def extractStr(x: Exp[Any]): String
 

@@ -78,7 +78,7 @@ class TestFactorial extends MySuite with Smt with Engine {
       }
     )
 
-  ignore("7") {
+  test("7") {
     expectResult(List("1", "1", "2", "6", "24", "120", "720")) {
       runN[Int](7){ o => exists[Int]{n => faco(n,o)} }
     }

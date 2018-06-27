@@ -84,14 +84,20 @@ trait Smt extends Base with InjectBase {
       seenvars = seenvars0
       val c = P("assert", List(p)).toString
       seenvars.foreach{solver.decl}
-      solver.add(c)
-      if (solver.checkSat()) {
-        val cs = extractModel()
-        call{() => cs.foreach(register); Yes}(k)
-        call{() => zAssert(P("not", List(P("and", cs.map({e => P("=", List(A(e.x), A(e.y)))})))))}(k)
-      } else {
-        throw Backtrack
+      def iter(c: String): Rel = {
+        solver.add(c)
+        if (solver.checkSat()) {
+          val cs = extractModel()
+          call{() => cs.foreach(register); Yes}(k)
+          iter(P("assert",
+            List(P("not", List(P("and",
+              cs.map({e => P("=", List(A(e.x), A(e.y)))})))))).toString
+          )
+        } else {
+          throw Backtrack
+        }
       }
+      iter(c)
     }
 
   }

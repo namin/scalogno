@@ -88,7 +88,8 @@ def infix_===[T](a: => Exp[T], b: => Exp[T]): Rel = {
   register(IsEqual(a,b)); Yes }
 
 def term[T](key: String, args: List[Exp[Any]]): Exp[T] = {
-  val e = fresh[T]; register(IsTerm(e.id, key, args)); e }  
+  val e = fresh[T];
+  register(IsTerm(e.id, key, args)); e }
 
 // constraints
 abstract class Constraint

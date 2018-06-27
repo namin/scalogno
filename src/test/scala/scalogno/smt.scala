@@ -64,6 +64,13 @@ class TestSmt extends MySuite with Smt with Engine {
       }
     }
   }
+  test("3") {
+    expectResult(List("1", "2", "3")) {
+      runN[Int](3) { q =>
+        exists[Int]{ n => A(3) > n && q ==? (n + 1) }
+      }
+    }
+  }
 }
 
 class TestFactorial extends MySuite with Smt with Engine {
@@ -78,7 +85,7 @@ class TestFactorial extends MySuite with Smt with Engine {
       }
     )
 
-  test("7") {
+  ignore("7") {
     expectResult(List("1", "1", "2", "6", "24", "120", "720")) {
       runN[Int](7){ o => exists[Int]{n => faco(n,o)} }
     }

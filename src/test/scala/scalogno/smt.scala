@@ -85,8 +85,8 @@ class TestFactorial extends MySuite with Smt with Engine {
   }
 }
 
-class TestFib extends MySuite with Smt with Engine/*with ListBase with TablingBase with TablingImpl*/ {
-  def fibo(n: Exp[Int], o: Exp[Int]): Rel = /*memo(term("fibo", List(n,o)))*/ {
+class TestFib extends MySuite with Smt with Engine with ListBase with TablingBase with TablingImpl {
+  def fibo(n: Exp[Int], o: Exp[Int]): Rel = memo(term("fibo", List(n,o))) {
     ((n ==? 0) && (o ==? 1)) ||
     ((n ==? 1) && (o ==? 2)) ||
     { val n1,n2,o1,o2 = fresh[Int]

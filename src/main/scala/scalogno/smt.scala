@@ -18,10 +18,26 @@ class SmtSolver {
       //case debug => println("smt gives "+debug); true
     }
   }
-  def push(): Unit = smt.write("(push)")
-  def pop(): Unit = smt.write("(pop)")
+  var scope = 0
+  def push(): Unit = {
+    scope += 1
+    smt.write("(push)")
+  }
+  def pop(): Unit = {
+    scope -= 1
+    smt.write("(pop)")
+  }
+  var scopes: Map[Int,Int] = Map.empty
   def decl(id: Int): Unit = {
-    smt.write(s"(declare-const x$id Int)")
+    scopes.get(id) match {
+      case None =>
+        smt.write(s"(declare-const x$id Int)")
+      case Some(s) =>
+        if (s >= scope) {
+          smt.write(s"(declare-const x$id Int)")
+        }
+    }
+    scopes += (id -> scope)
   }
   def add(c: String): Unit = smt.write(c)
   def extractModel(f: (Int,Int) => Unit): Unit = {

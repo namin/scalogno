@@ -42,7 +42,7 @@ class TestExe extends MySuite with Engine {
 }
 
 class TestSmt extends MySuite with Smt with Engine {
-  test("0") {
+ test("0") {
     expectResult(Nil) {
       run[Int] { q =>
         A(0) ==? A(1)

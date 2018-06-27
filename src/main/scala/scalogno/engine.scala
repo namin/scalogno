@@ -11,7 +11,6 @@ val Backtrack = new Exception
 var varCount: Int = 0
 def freshId = {
   val id = varCount
-  solver.decl(id)
   varCount += 1
   id
 }

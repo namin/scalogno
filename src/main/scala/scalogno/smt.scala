@@ -20,7 +20,10 @@ class SmtSolver {
   }
   def push(): Unit = smt.write("(push)")
   def pop(): Unit = smt.write("(pop)")
-  def decl(id: Int): Unit = smt.write(s"(declare-const x$id Int)")
+  def decl(id: Int): Unit = {
+    smt.write(s"(declare-const x$id Int)")
+  }
+  def add(c: String): Unit = smt.write(c)
   def extractModel(f: (Int,Int) => Unit): Unit = {
     smt.write("(get-model)")
     val s = smt.readSExp()
@@ -28,6 +31,7 @@ class SmtSolver {
     for (m <- p.findAllMatchIn(s)) {
       val id = m.group(1).toInt
       val v = m.group(2).toInt
+      println(s"$id has $v")
       f(id, v)
     }
   }
@@ -38,7 +42,7 @@ trait Smt extends Base with InjectBase {
   case class A[+T](x: Exp[T]) extends Z[T] {
     override def toString = {
       val cs = cstore.collect{ case(IsTerm(id, k, _)) if x.id == id => k}.toIterator
-      if (cs.hasNext) cs.next else { "x"+x.id }
+      if (cs.hasNext) cs.next else { addVar(x.id); "x"+x.id }
     }
   }
   case class P[+T](s: String, args: List[Z[Any]]) extends Z[T] {
@@ -67,26 +71,29 @@ trait Smt extends Base with InjectBase {
     var cs: List[IsEqual] = Nil
     solver.extractModel({(x,v) =>
       val c = IsEqual(Exp(x),term(v.toString, Nil))
-      register(c)
       cs = c::cs
     })
     cs
   }
 
-  def zAssert(p: P[Boolean]): Rel = {
-    val c = P("assert", List(p)).toString
-    println("c: "+c)
-    solver.smt.write(c)
-    if (solver.checkSat()) {
-      //solver.push()
-      val cs = extractModel()
-      Yes || {
-        //solver.pop()
-        zAssert(P("not", List(P("and", cs.map({e => P("=", List(A(e.x), A(e.y)))})))))
+  val seenvars0: immutable.Set[Int] = immutable.Set.empty
+  var seenvars = seenvars0
+  def addVar(id: Int) = { seenvars += id }
+  def zAssert(p: P[Boolean]): Rel = new Rel {
+    def exec(call: Exec)(k: Cont) = {
+      seenvars = seenvars0
+      val c = P("assert", List(p)).toString
+      seenvars.foreach{solver.decl}
+      solver.add(c)
+      if (solver.checkSat()) {
+        val cs = extractModel()
+        call{() => cs.foreach(register); Yes}(k)
+        call{() => zAssert(P("not", List(P("and", cs.map({e => P("=", List(A(e.x), A(e.y)))})))))}(k)
+      } else {
+        throw Backtrack
       }
-    } else {
-      throw Backtrack
     }
+
   }
 }
 

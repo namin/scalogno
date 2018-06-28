@@ -11,7 +11,7 @@ trait TablingBase extends Base with Engine {
 
 }
 
-trait TablingImpl extends TablingBase {
+trait TablingImpl extends TablingBase with Smt {
 type Answer = (Exp[Any] => Unit)
 case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
   def load(ans: Answer): Unit = {

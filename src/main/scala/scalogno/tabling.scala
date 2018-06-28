@@ -54,7 +54,11 @@ def makeCall(goal0: Exp[Any], k: Cont): Call = {
 }
 
 def makeAnswer(g1: Exp[Any]): Answer = {
-  val lcstore = cstore
+  val lcstore = {
+    // committed choice
+    extractModel()
+    cstore
+  }
   val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
 
   (g2: Exp[Any]) => {

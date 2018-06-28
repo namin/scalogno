@@ -142,7 +142,6 @@ def register(c: Constraint): Unit = {
 
 trait Engine extends Base {
   def extractModel(): Unit = {
-    var cs: List[IsEqual] = Nil
     solver.extractModel({(x,v) =>
       register(IsEqual(Exp(x),term(v.toString, Nil)))
     })

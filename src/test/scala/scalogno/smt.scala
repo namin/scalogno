@@ -92,7 +92,7 @@ class TestFactorial extends MySuite with Smt with Engine {
   }
 }
 
-class TestFib extends MySuite with Smt with Engine /*with ListBase with TablingBase with TablingImpl*/ {
+trait TestFibBase extends MySuite with Smt with Engine /*with ListBase with TablingBase with TablingImpl*/ {
   def fibo(n: Exp[Int], o: Exp[Int]): Rel = /*memo(term("fibo", List(n,o)))*/ {
     ((n ==? 0) && (o ==? 1)) ||
     ((n ==? 1) && (o ==? 2)) ||
@@ -111,4 +111,10 @@ class TestFib extends MySuite with Smt with Engine /*with ListBase with TablingB
       runN[Int](6){ o => exists[Int]{n => fibo(n,o)} }
     }
   }
+}
+
+class TestFib extends TestFibBase
+
+class TestFibTabling extends TestFibBase with ListBase with TablingBase with TablingImpl {
+  override def fibo(n: Exp[Int], o: Exp[Int]): Rel = memo(term("fibo", List(n,o))) { super.fibo(n, o) }
 }

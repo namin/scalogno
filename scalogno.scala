@@ -66,6 +66,11 @@ abstract class Solver {
   def fresh[T]: Exp[T]
   def register(c: Constraint): Unit
   def extractModel(x: Exp[Any]): Model
+
+  def cstore: immutable.Set[Constraint]
+  def decl(id: Int): Unit = {}
+  def add(c: String): Unit = {}
+  def checkSat(): Boolean = true
 }
 
 class VanillaSolver extends BaseSolver {
@@ -143,17 +148,71 @@ abstract class BaseSolver extends Solver {
   }
 
 class SmtSolver extends VanillaSolver {
+  val smt = new SmtEngine()
   override def push(): State = {
+    smt.push()
     super.push()
   }
   override def pop(restore: State): Unit = {
+    smt.pop()
     super.pop(restore)
   }
+  override def decl(id: Int): Unit = smt.decl(id)
+  override def add(c: String): Unit = smt.add(c)
+  override def checkSat(): Boolean =  smt.checkSat()
 }
 }
 
 object scalogno extends ScalognoBase {
   override val solver = new VanillaSolver()
+}
+
+trait ScalognoSmt extends ScalognoBase {
+  abstract class Z[+T]
+  case class A[+T](x: Exp[T]) extends Z[T] {
+    override def toString = {
+      val cs = solver.cstore.collect{ case(IsTerm(id, k, _)) if x.id == id => k}.toIterator
+      if (cs.hasNext) cs.next else { addVar(x.id); "x"+x.id }
+    }
+  }
+  case class P[+T](s: String, args: List[Z[Any]]) extends Z[T] {
+    override def toString = {
+      val a = args.mkString(" ")
+      s"($s $a)"
+    }
+  }
+
+  implicit object InjectInt {
+    def toTerm(i: Int): Exp[Int] = term(i.toString,Nil)
+  }
+  implicit def int2ZInt(e: Int): Z[Int] = toZInt(InjectInt.toTerm(e))
+  implicit def toZInt(e: Exp[Int]): Z[Int] = A(e)
+  implicit def toZIntOps(e: Exp[Int]) = ZIntOps(A(e))
+  implicit class ZIntOps(a: Z[Int]) {
+    def ==?(b: Z[Int]): Rel = zAssert(P("=", List(a, b)))
+    def !=?(b: Z[Int]): Rel = zAssert(P("not", List(P("=", List(a, b)))))
+    def >(b: Z[Int]): Rel = zAssert(P(">", List(a, b)))
+    def >=(b: Z[Int]): Rel = zAssert(P(">=", List(a, b)))
+    def -(b: Z[Int]): Z[Int] = P("-", List(a, b))
+    def *(b: Z[Int]): Z[Int] = P("*", List(a, b))
+    def +(b: Z[Int]): Z[Int] = P("+", List(a, b))
+  }
+
+  val seenvars0: immutable.Set[Int] = immutable.Set.empty
+  var seenvars = seenvars0
+  def addVar(id: Int) = { seenvars += id }
+  def zAssert(p: P[Boolean]): Rel = {
+    seenvars = seenvars0
+    val c = P("assert", List(p)).toString
+    seenvars.foreach{solver.decl}
+    solver.add(c)
+    if (!solver.checkSat()) throw Backtrack
+    Yes
+  }
+}
+
+object scalogno_smt extends ScalognoSmt {
+  override val solver = new SmtSolver()
 }
 
 object test {

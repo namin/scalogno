@@ -141,6 +141,15 @@ val solver: Solver = new VanillaSolver()
   implicit class ExpOps[T](a: Exp[T]) {
     def ===[U](b: Exp[U]) = infix_===(a,b)
   }
+
+class SmtSolver extends VanillaSolver {
+  override def push(): State = {
+    super.push()
+  }
+  override def pop(restore: State): Unit = {
+    super.pop(restore)
+  }
+}
 }
 
 object test {

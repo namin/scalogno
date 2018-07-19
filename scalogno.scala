@@ -67,6 +67,7 @@ abstract class Solver {
   def register(c: Constraint): Unit
   def extractModel(x: Exp[Any]): Model
 
+  def init(): Unit = {}
   def cstore: immutable.Set[Constraint]
   def decl(id: Int): Unit = {}
   def add(c: String): Unit = {}
@@ -149,6 +150,9 @@ abstract class BaseSolver extends Solver {
 
 class SmtSolver extends VanillaSolver {
   val smt = new SmtEngine()
+  override def init(): Unit = {
+    smt.init()
+  }
   override def push(): State = {
     smt.push()
     super.push()
@@ -221,6 +225,7 @@ object test {
   def e(x: Any) = term(x.toString, Nil)
 
   def main(args: Array[String]) {
+    solver.init()
     assert(run[Any]{q => q === e(1) || q === e(2)} == List("1","2"))
   }
 }

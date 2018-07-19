@@ -66,12 +66,14 @@ abstract class Solver {
   def extractModel(x: Exp[Any]): Model
 }
 
-class VanillaSolver extends Solver {
+class VanillaSolver extends BaseSolver {
   override type State = immutable.Set[Constraint]
-  override type Model = String
-  var cstore: immutable.Set[Constraint] = immutable.Set.empty
   override def push(): State = cstore
   override def pop(restore: State): Unit = { cstore = restore }
+}
+abstract class BaseSolver extends Solver {
+  override type Model = String
+  var cstore: immutable.Set[Constraint] = immutable.Set.empty
 
   var varCount: Int = 0
   def freshId = {

@@ -1,6 +1,8 @@
 import scala.collection._
 
-object scalogno {
+abstract class ScalognoBase {
+val solver: Solver
+
 type Goal = () => Rel
 
 trait Rel { def exec(call: Exec)(k: Cont): Unit }
@@ -132,8 +134,6 @@ abstract class BaseSolver extends Solver {
   }
 }
 
-val solver: Solver = new VanillaSolver()
-
   implicit class RelOps(a: => Rel) {
     def &&(b: => Rel) = infix_&&(a,b)
     def ||(b: => Rel) = infix_||(a,b)
@@ -150,6 +150,10 @@ class SmtSolver extends VanillaSolver {
     super.pop(restore)
   }
 }
+}
+
+object scalogno extends ScalognoBase {
+  override val solver = new VanillaSolver()
 }
 
 object test {

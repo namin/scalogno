@@ -186,8 +186,8 @@ trait ScalognoSmt extends ScalognoBase {
     }
   }
 
-  implicit object InjectInt {
-    def toTerm(i: Int): Exp[Int] = term(i.toString,Nil)
+  object InjectInt {
+    implicit def toTerm(i: Int): Exp[Int] = term(i.toString,Nil)
   }
   implicit def int2ZInt(e: Int): Z[Int] = toZInt(InjectInt.toTerm(e))
   implicit def toZInt(e: Exp[Int]): Z[Int] = A(e)
@@ -220,13 +220,12 @@ object scalogno_smt extends ScalognoSmt {
 }
 
 object test {
-  import scalogno._
-
-  def e(x: Any) = term(x.toString, Nil)
+  import scalogno_smt._
+  import InjectInt._
 
   def main(args: Array[String]) {
     solver.init()
-    assert(run[Any]{q => q === e(1) || q === e(2)} == List("1","2"))
+    assert(run[Any]{q => q === 1 || q === 2} == List("1","2"))
   }
 }
 

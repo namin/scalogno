@@ -164,6 +164,12 @@ class SmtSolver extends VanillaSolver {
   override def decl(id: Int): Unit = smt.decl(id)
   override def add(c: String): Unit = smt.add(c)
   override def checkSat(): Boolean =  smt.checkSat()
+  override def extractModel(x: Exp[Any]): Model = {
+    smt.extractModel({(x,v) =>
+      register(IsEqual(Exp(x),term(v.toString, Nil)))
+    })
+    super.extractModel(x)
+  }
 }
 }
 
@@ -226,6 +232,7 @@ object test {
   def main(args: Array[String]) {
     solver.init()
     assert(run[Any]{q => q === 1 || q === 2} == List("1","2"))
+    assert(run[Int]{q => q ==? 1 || q ==? 2} == List("1","2"))
   }
 }
 

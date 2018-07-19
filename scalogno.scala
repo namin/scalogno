@@ -229,10 +229,23 @@ object test {
   import scalogno_smt._
   import InjectInt._
 
+  def faco(n: Exp[Int], o: Exp[Int]): Rel =
+    (n >= 0) && (
+      (n ==? 0) && (o ==? 1) ||
+
+      exists[Int]{n1 => exists[Int]{r =>
+        (n - 1) ==? n1 &&
+          (n * r) ==? o &&
+        faco(n1, r)
+      }}
+    )
+
   def main(args: Array[String]) {
     solver.init()
     assert(run[Any]{q => q === 1 || q === 2} == List("1","2"))
     assert(run[Int]{q => q ==? 1 || q ==? 2} == List("1","2"))
+    assert(runN[Int](7){ o => exists[Int]{n => faco(n,o)} } ==
+      List("1", "1", "2", "6", "24", "120", "720"))
   }
 }
 

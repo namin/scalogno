@@ -60,12 +60,12 @@ def run[T](f: Exp[T] => Rel): Seq[solver.Model] = runN(scala.Int.MaxValue)(f)
 
 abstract class Solver {
   type State
-  type FullState = (String, State)
+  type FullState = ((Map[Int,Int],List[List[String]]), State)
   type Model
   def push(): State
   def pop(restore: State): Unit
   def save(): FullState = {
-    ("", push())
+    ((Map.empty,Nil), push())
   }
   def reset(restore: FullState): Unit = {
     pop(restore._2)
@@ -462,13 +462,15 @@ class SmtEngine {
     lines = (c::lines.head)::lines.tail
     smt.write(c)
   }
-  var from = "(reset)\n"
-  def save(): String = {
-    from+lines.reverse.map(_.reverse.mkString("\n")).mkString("\n")
+  type SMT_State = (Map[Int,Int], List[List[String]])
+  def save(): SMT_State = {
+    (scopes, lines)
   }
-  def reset(x: String): Unit = {
-    from = x+"\n"
-    smt.write(from)
+  def reset(x: SMT_State): Unit = {
+    scopes = x._1
+    lines = x._2
+    scope = lines.length
+    smt.write("(reset)\n"+lines.reverse.map(_.reverse.mkString("\n")).mkString("\n"))
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
     smt.write("(get-model)")

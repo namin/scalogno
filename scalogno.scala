@@ -456,11 +456,13 @@ class SmtEngine {
     lines = (c::lines.head)::lines.tail
     smt.write(c)
   }
+  var from = "(reset)\n"
   def save(): String = {
-    "(reset)\n"+lines.reverse.map(_.reverse.mkString("\n")).mkString("\n")
+    from+lines.reverse.map(_.reverse.mkString("\n")).mkString("\n")
   }
   def reset(x: String): Unit = {
-    smt.write(x+"\n")
+    from = x+"\n"
+    smt.write(from)
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
     smt.write("(get-model)")

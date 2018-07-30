@@ -171,10 +171,12 @@ class SmtSolver extends VanillaSolver {
     super.pop(restore)
   }
   override def save(): FullState = {
+    smt.push()
     (smt.save(), super.push())
   }
   override def reset(restore: FullState): Unit = {
     smt.reset(restore._1)
+    smt.pop()
     super.reset(restore)
   }
   override def decl(id: Int): Unit = smt.decl(id)
@@ -435,14 +437,14 @@ class SmtEngine {
   def push(): Unit = {
     scope += 1
     lines = Nil::lines
-    smt.write("(push)")
+    add("(push)")
   }
   def pop(): Unit = {
+    add("(pop)")
     scopes = scopes.collect{case (k,v) if v < scope => (k,v)}.toMap
     scope -= 1
     assert(scope >= 0)
     lines = lines.tail
-    smt.write("(pop)")
   }
   var scopes: Map[Int,Int] = Map.empty
   def decl(id: Int): Unit = {
@@ -459,8 +461,9 @@ class SmtEngine {
   }
   def add(c: String): Unit = {
     print(scope.toString+" ")
-    lines = (c::lines.head)::lines.tail
+    println(lines.length)
     smt.write(c)
+    lines = (c::lines.head)::lines.tail
   }
   type SMT_State = (Map[Int,Int], List[List[String]])
   def save(): SMT_State = {
@@ -470,7 +473,7 @@ class SmtEngine {
     scopes = x._1
     lines = x._2
     scope = lines.length
-    smt.write("(reset)\n"+lines.reverse.map(_.reverse.mkString("\n")).mkString("\n"))
+    smt.write("(reset)\n(set-logic ALL_SUPPORTED)\n"+lines.reverse.map(_.reverse.mkString("\n")).mkString("\n"))
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
     smt.write("(get-model)")

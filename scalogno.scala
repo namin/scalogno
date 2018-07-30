@@ -335,7 +335,7 @@ object test {
   import scalogno._
   import InjectInt._
 
-  def faco(n: Exp[Int], o: Exp[Int]): Rel = memo(term("faco", List(n,o))) {
+  def faco(n: Exp[Int], o: Exp[Int]): Rel = //memo(term("faco", List(n,o))) {
     (n >= 0) && (
       (n ==? 0) && (o ==? 1) ||
 
@@ -345,7 +345,7 @@ object test {
         faco(n1, r)
       }}
     )
-  }
+  //}
   def main(args: Array[String]) {
     solver.init()
     assert(run[Any]{q => q === 1 || q === 2} == List("1","2"))
@@ -440,6 +440,7 @@ class SmtEngine {
   def pop(): Unit = {
     scopes = scopes.collect{case (k,v) if v < scope => (k,v)}.toMap
     scope -= 1
+    assert(scope >= 0)
     lines = lines.tail
     smt.write("(pop)")
   }

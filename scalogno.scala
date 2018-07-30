@@ -239,9 +239,9 @@ trait ScalognoSmt extends ScalognoBase {
 
 trait ScalognoTabling extends ScalognoSmt {
 type Answer = (Exp[Any] => Unit)
-case class Call(key: String, goal1: Exp[Any], state1: solver.State, k1: Cont) {
+case class Call(key: String, goal1: Exp[Any], state1: solver.FullState, k1: Cont) {
   def load(ans: Answer): Unit = {
-    solver.pop(state1) // TODO
+    solver.reset(state1)
     ans(goal1);
   }
 }
@@ -252,7 +252,7 @@ val contTable = new mutable.HashMap[String, List[Call]]
 // save complete call state
 def makeCall(goal0: Exp[Any], k: Cont): Call = {
   val key = solver.extractModel(goal0).asInstanceOf[String]
-  val cont = Call(key,goal0,solver.push(),k)
+  val cont = Call(key,goal0,solver.save(),k)
   contTable(key) = cont::contTable.getOrElse(key,Nil)
   cont
 }

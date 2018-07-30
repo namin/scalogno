@@ -72,6 +72,8 @@ abstract class Solver {
   def decl(id: Int): Unit = {}
   def add(c: String): Unit = {}
   def checkSat(): Boolean = true
+
+  def varCount: Int
 }
 
 class VanillaSolver extends BaseSolver {
@@ -219,6 +221,92 @@ trait ScalognoSmt extends ScalognoBase {
     if (!solver.checkSat()) throw Backtrack
     Yes
   }
+}
+
+trait ScalognoTabling extends ScalognoSmt {
+type Answer = (Exp[Any] => Unit)
+case class Call(key: String, goal1: Exp[Any], state1: solver.State, k1: Cont) {
+  def load(ans: Answer): Unit = {
+    solver.pop(state1) // TODO
+    ans(goal1);
+  }
+}
+
+val ansTable = new mutable.HashMap[String, mutable.HashMap[String, Answer]]
+val contTable = new mutable.HashMap[String, List[Call]]
+
+// save complete call state
+def makeCall(goal0: Exp[Any], k: Cont): Call = {
+  val key = solver.extractModel(goal0).asInstanceOf[String]
+  val cont = Call(key,goal0,solver.push(),k)
+  contTable(key) = cont::contTable.getOrElse(key,Nil)
+  cont
+}
+
+def makeAnswer(g1: Exp[Any]): Answer = {
+  val lcstore = solver.cstore
+  val lidx = solver.cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+
+  (g2: Exp[Any]) => {
+
+    val stack = new mutable.BitSet(solver.varCount)
+    val seenVars = new mutable.HashMap[Int,Int]
+    def copyVar(x: Exp[Any]): Exp[Any] = {
+      val id = (Set(x.id) ++ (lcstore collect {
+        case IsEqual(`x`,y) if y.id < x.id => y.id
+        case IsEqual(y,`x`) if y.id < x.id => y.id
+      })).min
+      val mid = seenVars.getOrElseUpdate(id,seenVars.size)
+      Exp(mid)
+    }
+    def copyTerm(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
+      case Some(IsTerm(id, key, args)) =>
+        assert(id == x.id)
+        assert(!stack.contains(id), "cyclic terms not handled")
+        try {
+          stack += id
+          term(key, args map copyTerm)
+        } finally {
+          stack -= id
+        }
+      case _ =>
+        copyVar(x)
+    }
+
+    val g1_copy = copyTerm(g1)
+
+    g1_copy === g2
+  }
+}
+
+def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
+  override def exec(rec: Exec)(k: Cont): Unit = {
+    def resume(cont: Call, ans: Answer) = rec{ () => cont.load(ans); Yes }(cont.k1)
+
+    val cont = makeCall(goal0, k)
+    ansTable.get(cont.key) match {
+      case Some(answers) =>
+        for (ans <- answers.values) resume(cont, ans)
+      case None =>
+        val ansMap = new mutable.HashMap[String, Answer]
+        ansTable(cont.key) = ansMap
+        rec { () =>
+          a
+        } { () =>
+          val ansKey = solver.extractModel(goal0).asInstanceOf[String]
+          ansMap.get(ansKey) match {
+            case None =>
+              val ans = makeAnswer(cont.goal1)
+              ansMap(ansKey) = ans
+              for (cont1 <- contTable(cont.key).reverse) {
+                resume(cont1, ans)
+              }
+            case Some(_) =>
+          }
+        }
+    }
+  }
+}
 }
 
 object scalogno_smt extends ScalognoSmt {

@@ -189,7 +189,7 @@ class SmtSolver extends VanillaSolver {
 }
 }
 
-object scalogno extends ScalognoBase {
+object scalogno_vanilla extends ScalognoBase {
   override val solver = new VanillaSolver()
 }
 
@@ -327,11 +327,15 @@ object scalogno_smt extends ScalognoSmt {
   override val solver = new SmtSolver()
 }
 
+object scalogno extends ScalognoTabling {
+  override val solver = new SmtSolver()
+}
+
 object test {
-  import scalogno_smt._
+  import scalogno._
   import InjectInt._
 
-  def faco(n: Exp[Int], o: Exp[Int]): Rel =
+  def faco(n: Exp[Int], o: Exp[Int]): Rel = memo(term("faco", List(n,o))) {
     (n >= 0) && (
       (n ==? 0) && (o ==? 1) ||
 
@@ -341,13 +345,14 @@ object test {
         faco(n1, r)
       }}
     )
-
+  }
   def main(args: Array[String]) {
     solver.init()
     assert(run[Any]{q => q === 1 || q === 2} == List("1","2"))
     assert(run[Int]{q => q ==? 1 || q ==? 2} == List("1","2"))
     assert(runN[Int](7){ o => exists[Int]{n => faco(n,o)} } ==
       List("1", "1", "2", "6", "24", "120", "720"))
+    println("DONE")
   }
 }
 

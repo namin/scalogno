@@ -60,9 +60,16 @@ def run[T](f: Exp[T] => Rel): Seq[solver.Model] = runN(scala.Int.MaxValue)(f)
 
 abstract class Solver {
   type State
+  type FullState = (String, State)
   type Model
   def push(): State
   def pop(restore: State): Unit
+  def save(): FullState = {
+    ("", push())
+  }
+  def reset(restore: FullState): Unit = {
+    pop(restore._2)
+  }
   def fresh[T]: Exp[T]
   def register(c: Constraint): Unit
   def extractModel(x: Exp[Any]): Model
@@ -162,6 +169,13 @@ class SmtSolver extends VanillaSolver {
   override def pop(restore: State): Unit = {
     smt.pop()
     super.pop(restore)
+  }
+  override def save(): FullState = {
+    (smt.save(), super.push())
+  }
+  override def reset(restore: FullState): Unit = {
+    smt.reset(restore._1)
+    super.reset(restore)
   }
   override def decl(id: Int): Unit = smt.decl(id)
   override def add(c: String): Unit = smt.add(c)
@@ -412,31 +426,41 @@ class SmtEngine {
     }
   }
   var scope = 0
+  var lines: List[List[String]] = Nil
   def push(): Unit = {
     scope += 1
+    lines = Nil::lines
     smt.write("(push)")
   }
   def pop(): Unit = {
     scopes = scopes.collect{case (k,v) if v < scope => (k,v)}.toMap
     scope -= 1
+    lines = lines.tail
     smt.write("(pop)")
   }
   var scopes: Map[Int,Int] = Map.empty
   def decl(id: Int): Unit = {
     scopes.get(id) match {
       case None =>
-        smt.write(s"(declare-const x$id Int)")
+        add(s"(declare-const x$id Int)")
         scopes += (id -> scope)
       case Some(s) =>
         if (s >= scope) {
-          smt.write(s"(declare-const x$id Int)")
+          add(s"(declare-const x$id Int)")
           scopes += (id -> scope)
         }
     }
   }
   def add(c: String): Unit = {
     print(scope.toString+" ")
+    lines = (c::lines.head)::lines.tail
     smt.write(c)
+  }
+  def save(): String = {
+    "(reset)\n"+lines.reverse.map(_.reverse.mkString("\n")).mkString("\n")
+  }
+  def reset(x: String): Unit = {
+    smt.write(x+"\n")
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
     smt.write("(get-model)")

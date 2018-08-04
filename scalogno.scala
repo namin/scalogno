@@ -60,16 +60,9 @@ def run[T](f: Exp[T] => Rel): Seq[solver.Model] = runN(scala.Int.MaxValue)(f)
 
 abstract class Solver {
   type State
-  type FullState = ((Map[Int,Int],List[List[String]]), State)
   type Model
   def push(): State
   def pop(restore: State): Unit
-  def save(): FullState = {
-    ((Map.empty,Nil), push())
-  }
-  def reset(restore: FullState): Unit = {
-    pop(restore._2)
-  }
   def fresh[T]: Exp[T]
   def register(c: Constraint): Unit
   def extractModel(x: Exp[Any]): Model
@@ -157,32 +150,42 @@ abstract class BaseSolver extends Solver {
     def ===[U](b: Exp[U]) = infix_===(a,b)
   }
 
-class SmtSolver extends VanillaSolver {
+class SmtSolver extends BaseSolver {
+  type SmtState = (List[Int], List[String])
+  var smt_decls: List[Int] = Nil
+  var smt_lines: List[String] = Nil
+  override type State = (immutable.Set[Constraint], SmtState)
   val smt = new SmtEngine()
   override def init(): Unit = {
     smt.init()
   }
   override def push(): State = {
-    smt.push()
-    super.push()
+    (cstore, (smt_decls, smt_lines))
   }
   override def pop(restore: State): Unit = {
-    smt.pop()
-    super.pop(restore)
+    cstore = restore._1
+    smt_decls = restore._2._1
+    smt_lines = restore._2._2
   }
-  override def save(): FullState = {
-    smt.push()
-    (smt.save(), super.push())
+  override def decl(id: Int): Unit = {
+    smt_decls = id::smt_decls
+    //smt.decl(id)
   }
-  override def reset(restore: FullState): Unit = {
-    smt.reset(restore._1)
-    smt.pop()
-    super.reset(restore)
+  override def add(c: String): Unit = {
+    smt_lines = c::smt_lines
+    //smt.add(c)
   }
-  override def decl(id: Int): Unit = smt.decl(id)
-  override def add(c: String): Unit = smt.add(c)
-  override def checkSat(): Boolean =  smt.checkSat()
+  def smt_fromStart(): Unit = {
+    smt.reset()
+    smt_decls.reverse.foreach(smt.decl)
+    smt_lines.reverse.foreach(smt.add)
+  }
+  override def checkSat(): Boolean = {
+    smt_fromStart()
+    smt.checkSat()
+  }
   override def extractModel(x: Exp[Any]): Model = {
+    smt_fromStart()
     smt.extractModel({(x,v) =>
       register(IsEqual(Exp(x),term(v.toString, Nil)))
     })
@@ -241,9 +244,9 @@ trait ScalognoSmt extends ScalognoBase {
 
 trait ScalognoTabling extends ScalognoSmt {
 type Answer = (Exp[Any] => Unit)
-case class Call(key: String, goal1: Exp[Any], state1: solver.FullState, k1: Cont) {
+case class Call(key: String, goal1: Exp[Any], state1: solver.State, k1: Cont) {
   def load(ans: Answer): Unit = {
-    solver.reset(state1)
+    solver.pop(state1)
     ans(goal1);
   }
 }
@@ -254,7 +257,7 @@ val contTable = new mutable.HashMap[String, List[Call]]
 // save complete call state
 def makeCall(goal0: Exp[Any], k: Cont): Call = {
   val key = solver.extractModel(goal0).asInstanceOf[String]
-  val cont = Call(key,goal0,solver.save(),k)
+  val cont = Call(key,goal0,solver.push(),k)
   contTable(key) = cont::contTable.getOrElse(key,Nil)
   cont
 }
@@ -351,9 +354,9 @@ object test {
   def main(args: Array[String]) {
     solver.init()
     assert(run[Any]{q => q === 1 || q === 2} == List("1","2"))
+    println(run[Int]{q => q ==? 1 || q ==? 2})
     assert(run[Int]{q => q ==? 1 || q ==? 2} == List("1","2"))
-    assert(runN[Int](7){ o => exists[Int]{n => faco(n,o)} } ==
-      List("1", "1", "2", "6", "24", "120", "720"))
+    assert(runN[Int](1){ o => faco(6,o) } == List("720"))
     println("DONE")
   }
 }
@@ -432,48 +435,15 @@ class SmtEngine {
       //case debug => println("smt gives "+debug); true
     }
   }
-  var scope = 0
-  var lines: List[List[String]] = Nil
-  def push(): Unit = {
-    scope += 1
-    lines = Nil::lines
-    add("(push)")
-  }
-  def pop(): Unit = {
-    add("(pop)")
-    scopes = scopes.collect{case (k,v) if v < scope => (k,v)}.toMap
-    scope -= 1
-    assert(scope >= 0)
-    lines = lines.tail
-  }
-  var scopes: Map[Int,Int] = Map.empty
   def decl(id: Int): Unit = {
-    scopes.get(id) match {
-      case None =>
-        add(s"(declare-const x$id Int)")
-        scopes += (id -> scope)
-      case Some(s) =>
-        if (s >= scope) {
-          add(s"(declare-const x$id Int)")
-          scopes += (id -> scope)
-        }
-    }
+    smt.write(s"(declare-const x$id Int)")
   }
   def add(c: String): Unit = {
-    print(scope.toString+" ")
-    println(lines.length)
     smt.write(c)
-    lines = (c::lines.head)::lines.tail
   }
-  type SMT_State = (Map[Int,Int], List[List[String]])
-  def save(): SMT_State = {
-    (scopes, lines)
-  }
-  def reset(x: SMT_State): Unit = {
-    scopes = x._1
-    lines = x._2
-    scope = lines.length
-    smt.write("(reset)\n(set-logic ALL_SUPPORTED)\n"+lines.reverse.map(_.reverse.mkString("\n")).mkString("\n"))
+  def reset(): Unit = {
+    smt.write("(reset)")
+    smt.write("(set-logic ALL_SUPPORTED)")
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
     smt.write("(get-model)")

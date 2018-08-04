@@ -177,7 +177,7 @@ class SmtSolver extends BaseSolver {
   }
   def smt_fromStart(): Unit = {
     smt.reset()
-    smt_decls.reverse.foreach(smt.decl)
+    smt_decls.toSet.foreach(smt.decl)
     smt_lines.reverse.foreach(smt.add)
   }
   override def checkSat(): Boolean = {

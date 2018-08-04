@@ -186,6 +186,7 @@ class SmtSolver extends BaseSolver {
   }
   override def extractModel(x: Exp[Any]): Model = {
     smt_fromStart()
+    assert(smt.checkSat())
     smt.extractModel({(x,v) =>
       register(IsEqual(Exp(x),term(v.toString, Nil)))
     })

@@ -355,9 +355,11 @@ object test {
   def main(args: Array[String]) {
     solver.init()
     assert(run[Any]{q => q === 1 || q === 2} == List("1","2"))
-    println(run[Int]{q => q ==? 1 || q ==? 2})
     assert(run[Int]{q => q ==? 1 || q ==? 2} == List("1","2"))
     assert(runN[Int](1){ o => faco(6,o) } == List("720"))
+    //assert(runN[Int](1){ n => faco(n,720) } == List("6"))
+    assert(runN[Int](7){ o => exists[Int]{n => faco(n,o)} } ==
+      List("1", "1", "2", "6", "24", "120", "720"))
     println("DONE")
   }
 }

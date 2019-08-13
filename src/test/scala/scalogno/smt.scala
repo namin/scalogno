@@ -112,3 +112,24 @@ class TestFib extends MySuite with Smt with Engine /*with ListBase with TablingB
     }
   }
 }
+
+class TestFibTab extends MySuite with Smt with Engine with ListBase with TablingBase with TablingImpl {
+  def fibo(n: Exp[Int], o: Exp[Int]): Rel = memo(term("fibo", List(n,o))) {
+    ((n ==? 0) && (o ==? 1)) ||
+    ((n ==? 1) && (o ==? 2)) ||
+    { val n1,n2,o1,o2 = fresh[Int]
+      (n > 1) &&
+      (n1 ==? (n - 1)) &&
+      (n2 ==? (n - 2)) &&
+      fibo(n2, o2) &&
+      fibo(n1, o1) &&
+      (o ==? o1 + o2) }
+
+  }
+
+  test("6") {
+    expectResult(List("1", "2", "3")) { // TODO: only three results!
+      runN[Int](6){ o => exists[Int]{n => fibo(n,o)} }
+    }
+  }
+}

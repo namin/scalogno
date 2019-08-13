@@ -3,6 +3,7 @@ package scalogno
 import scala.collection._
 
 class SmtSolver {
+  var lines: List[List[String]] = Nil
   var smt: Exe = _
   def init() = {
     smt = new Exe("cvc4 -m --interactive --lang smt")
@@ -20,31 +21,57 @@ class SmtSolver {
   var scope = 0
   def push(): Unit = {
     scope += 1
+    lines = Nil::lines
     smt.write("(push)")
   }
   def pop(): Unit = {
     scopes = scopes.collect{case (k,v) if v < scope => (k,v)}.toMap
+    if (scope == 0) { return }
     scope -= 1
+    lines = lines.tail
     smt.write("(pop)")
+  }
+  def reset(): Unit = {
+    scopes = Map.empty
+    lines = Nil
+    scope = 0
+    smt.write("(reset)")
+    smt.write("(set-logic ALL_SUPPORTED)")
+  }
+  type State = (List[List[String]], Map[Int,Int],Int)
+  def state: State = (lines,scopes,scope)
+  def restore(s: State): Unit = {
+    reset()
+    lines = s._1
+    scopes = s._2
+    scope = s._3
+    for (block <- lines.reverse) {
+      smt.write("(push)")
+      for (line <- block.reverse) {
+        smt.write(line)
+      }
+    }
   }
   var scopes: Map[Int,Int] = Map.empty
   def decl(id: Int): Unit = {
     scopes.get(id) match {
       case None =>
-        smt.write(s"(declare-const x$id Int)")
+        add(s"(declare-const x$id Int)")
         scopes += (id -> scope)
       case Some(s) =>
         if (s >= scope) {
-          smt.write(s"(declare-const x$id Int)")
+          add(s"(declare-const x$id Int)")
           scopes += (id -> scope)
         }
     }
   }
   def add(c: String): Unit = {
     print(scope.toString+" ")
+    lines = (c::lines.head)::lines.tail
     smt.write(c)
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
+    checkSat()
     smt.write("(get-model)")
     val s = smt.readSExp()
     val p = raw"\(define-fun x([0-9]+) \(\) Int ([0-9]+)\)".r

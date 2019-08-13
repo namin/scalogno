@@ -13,14 +13,15 @@ trait TablingBase extends Base with Engine {
 
 trait TablingImpl extends TablingBase {
 type Answer = (Exp[Any] => Unit)
-case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
+case class Call(val key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], solver_state1: solver.State, k1: Cont) {
   def load(ans: Answer): Unit = {
     // reset state to state at call
     cstore = cstore1; dvars = dvars1
+    solver.restore(solver_state1)
     // equate actual state with symbolic before state
     dvarsEqu(ldvars0)
     // load constraints from answer
-    ans(goal1);
+    ans(goal1)
     // update actual state to symbolic after state
     dvarsSet(ldvars1)
   }
@@ -48,7 +49,7 @@ def makeCall(goal0: Exp[Any], k: Cont): Call = {
 
   // but disregard state for memoization (compute key for goal0)
   val key = extractStr(goal0)
-  val cont = Call(key,goal,cstore,dvars,ldvars0,ldvars1,k)
+  val cont = Call(key,goal,cstore,dvars,ldvars0,ldvars1,solver.state,k)
   contTable(key) = cont::contTable.getOrElse(key,Nil)
   cont
 }
@@ -113,6 +114,7 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
           dvarsSet(cont.ldvars0)
           a
         } { () =>
+          extractModel()
           dvarsEqu(cont.ldvars1)
           val ansKey = extractStr(goal0)
           ansMap.get(ansKey) match {

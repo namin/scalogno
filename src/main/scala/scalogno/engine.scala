@@ -56,14 +56,17 @@ trait Base {
   def dvar_get[T](id: Int): T = dvars(id).asInstanceOf[T]
   def dvar_upd[T](id: Int)(f: T => T): Unit = dvars += id -> f(dvar_get(id))
 
-  // relations
+  // goals and relations
   trait Rel { def exec(call: Exec)(k: Cont): Unit }
-  type Exec = (() => Rel) => Cont => Unit
+  type Exec = GoalThunk => Cont => Unit
   type Cont = () => Unit
+  type GoalThunk = () => Rel
 
+  // unconditional success
   val Yes = new Rel {
     def exec(call: Exec)(k: Cont) = k() }
 
+  // unconditional failure
   val No = new Rel {
     def exec(call: Exec)(k: Cont) = throw Backtrack }
 

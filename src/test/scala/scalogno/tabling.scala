@@ -3,6 +3,7 @@ package scalogno
 import org.scalatest.{Engine => _, _}
 
 trait TestTablingAppBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
+  // APLAS 4.4 Definite Clause Grammar (DFG)
   def exp(s0: Exp[List[String]], s: Exp[List[String]]): Rel = memo(term("exp", List(s0,s))) {
     { val s1,s2 = fresh[List[String]]
       exp(s0,s1) && (s1 === cons("+",s2)) && trm(s2,s) } ||
@@ -23,6 +24,16 @@ trait TestTablingAppBase extends MySuite with ListBase with NatBase with Tabling
   }
 
   def tokenize(s: String): List[String] = s.toList.map(_.toString)
+
+  // APLAS 4.4 example
+  test("dfg-ex") {
+    expectResult(List("x0")) {
+      run[List[String]] { q =>
+        tabling(true)
+        exp(tokenize("3+4*7"), nil)
+      }
+    }
+  }
 
   test("exp1") {
     expectResult(List()) {
@@ -119,6 +130,8 @@ class TestTabling extends TestTablingBase with TablingImpl {
     (x === "b") && (y === "c") ||
     (x === "c") && (y === "a")
 
+  // APLAS 4.3 Example: Tabled Graph Evaluation
+
   def pathL(a: Exp[String], b: Exp[String]): Rel = memo(term("path",List(a,b))) {
     edge(a,b) || exists[String] { z => pathL(a,z) && { println("--"+extractStr(term("path-edge",List(a,z,b)))); edge(z,b) } }
   }
@@ -176,6 +189,7 @@ class TestTabling extends TestTablingBase with TablingImpl {
     println("done")
   }
 
+  // APLAS 4.3 example
   test("pathLT") {
     expectResult(List(
       "pair(b,cons(path(a,b),nil))",

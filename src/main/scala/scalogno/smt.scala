@@ -118,7 +118,7 @@ class Exe(command: String) {
       stderr => Source.fromInputStream(stderr).getLines.foreach(println)));
 
   def skipHeader() = synchronized {
-    (0 until 24/*brittle magic*/).foreach{_ => readLine()}
+    (0 until 30/*brittle magic*/).foreach{_ => readLine()}
   }
 
   def readLine(): String = synchronized {

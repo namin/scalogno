@@ -176,6 +176,7 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
   def call(e: () => Rel)(k: Cont): Unit = {
     val cstore1 = cstore
     val dvars1 = dvars
+    val solver_state1 = solver.state
     solver.push()
     try {
       e().exec(call)(k)
@@ -184,7 +185,7 @@ def runN[T](max: Int)(f: Exp[T] => Rel): Seq[String] = {
     } finally {
       cstore = cstore1
       dvars = dvars1
-      solver.pop()
+      solver.restore(solver_state1)
     }
   }
   val q = fresh[T]

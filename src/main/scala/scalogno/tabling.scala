@@ -120,6 +120,7 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
           ansMap.get(ansKey) match {
             case None =>
               val ans = makeAnswer(cont.goal1)
+              println(s"tabling: ${cont.key}: $ansKey")
               ansMap(ansKey) = ans
               for (cont1 <- contTable(cont.key).reverse) {
                 resume(cont1, ans)

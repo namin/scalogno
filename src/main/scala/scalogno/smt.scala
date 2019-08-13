@@ -46,7 +46,7 @@ class SmtSolver {
     scopes = s._2
     scope = s._3
     for (block <- lines.reverse) {
-      smt.write("(push)")
+      //smt.write("(push)")
       for (line <- block.reverse) {
         smt.write(line)
       }

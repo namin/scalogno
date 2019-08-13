@@ -269,13 +269,16 @@ trait TestGraphsBase extends MySuite with Base with Engine with NatBase with Lis
 
   test("graph") {
 
+    // APLAS 2.3 example
     val g = new Graph[String] {
+      // APLAS 2.1 Relations as Functions
       def edge(x:Exp[String],y:Exp[String]) =
         (x === "a") && (y === "b") ||
         (x === "b") && (y === "c") ||
         (x === "c") && (y === "a")
     }
 
+    // APLAS 2.1 edge example
     expectResult(List(
       "pair(a,b)", "pair(b,c)", "pair(c,a)"
     )) {
@@ -283,11 +286,42 @@ trait TestGraphsBase extends MySuite with Base with Engine with NatBase with Lis
         g.edge(q1,q2)
       }
     }
+    // APLAS 2.1 path example
     expectResult(List(
       "b", "c", "a", "b", "c", "a", "b", "c", "a", "b"
     )) {
       runN[String](10) { q =>
         g.path("a",q)
+      }
+    }
+
+    trait HOGraph[T] {
+      // APLAS 2.2 Higher-Order Relations as Higher-Order Functions
+      def generic_path(edge: (Exp[T],Exp[T]) => Rel)(x: Exp[T], y: Exp[T]): Rel = edge(x,y) || exists[T] { z => edge(x,z) && generic_path(edge)(z,y) }
+    }
+    val hog = new HOGraph[String](){}
+
+    expectResult(List(
+      "b", "c", "a", "b", "c", "a", "b", "c", "a", "b"
+    )) {
+      runN[String](10) { q =>
+        hog.generic_path(g.edge)("a", q)
+      }
+    }
+
+    trait RTC[T] {
+      def refl_trans_clos(r: (Exp[T],Exp[T]) => Rel)(x: Exp[T], y: Exp[T]): Rel = r(x,y) || exists[T] { z => r(x,z) && refl_trans_clos(r)(z,y) }
+      def refl_trans_closure(r: (Exp[T],Exp[T]) => Rel) = refl_trans_clos(r)_
+    }
+    val rtc = new RTC[String](){}
+    import rtc._
+    // APLAS 2.2 reflexive transitive closure
+    val path = refl_trans_closure(g.edge)
+    expectResult(List(
+      "b", "c", "a", "b", "c", "a", "b", "c", "a", "b"
+    )) {
+      runN[String](10) { q =>
+        path("a", q)
       }
     }
   }

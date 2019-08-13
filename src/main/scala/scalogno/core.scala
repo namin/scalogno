@@ -183,8 +183,10 @@ trait TreeBase extends InjectBase with NatBase with Ordering {
 
 trait GraphBase extends InjectBase with NatBase {
 
+  // APLAS 2.3 Object-Oriented Encapsulation
   trait Graph[T] {
     def edge(a: Exp[T], b: Exp[T]): Rel
+    // APLAS 2.1 path example
     def path(a: Exp[T], b: Exp[T]): Rel =
       edge(a,b) || exists[T] { z => edge(a,z) && path(z,b) }
   }

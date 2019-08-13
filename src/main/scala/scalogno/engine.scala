@@ -40,7 +40,7 @@ def freshId = {
   }
 
 // dynamically scoped variables
-var dvars: immutable.Map[Int, Any] = Map.empty
+var dvars: immutable.Map[Int, Any] = immutable.Map.empty
 case class DVar[T](val id: Int, val default: T) extends (() => T) {
   dvar_set(id,default)
   def apply()  = dvar_get[T](id)

@@ -1,6 +1,6 @@
 package scalogno
 
-import org.scalatest._
+import org.scalatest.{Engine => _, _}
 
 class MySuite extends FunSuite {
   def expectResult(expected: Object)(actual: Object) = {

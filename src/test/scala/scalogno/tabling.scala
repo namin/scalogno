@@ -1,6 +1,6 @@
 package scalogno
 
-import org.scalatest._
+import org.scalatest.{Engine => _, _}
 
 trait TestTablingAppBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
   def exp(s0: Exp[List[String]], s: Exp[List[String]]): Rel = memo(term("exp", List(s0,s))) {

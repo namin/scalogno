@@ -97,7 +97,7 @@ class TestFib extends MySuite with Smt with Engine /*with ListBase with TablingB
     ((n ==? 0) && (o ==? 1)) ||
     ((n ==? 1) && (o ==? 2)) ||
     { val n1,n2,o1,o2 = fresh[Int]
-      (n > 0) &&
+      (n > 1) &&
       (n1 ==? (n - 1)) &&
       (n2 ==? (n - 2)) &&
       (o ==? o1 + o2) &&

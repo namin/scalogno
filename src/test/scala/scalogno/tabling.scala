@@ -88,6 +88,7 @@ class TestTablingApp extends TestTablingAppBase with TablingImpl
 
 trait TestTablingBase extends MySuite with ListBase with NatBase with TablingBase with Engine {
 
+  // APLAS 4 fib example
   def fib(x:Exp[Int], y:Exp[Int]): Rel = memo(term("fib",List(x,y))) {
     (x === 0) && (y === 1) ||
     (x === 1) && (y === 1) || {

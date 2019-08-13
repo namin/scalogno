@@ -186,7 +186,7 @@ trait GraphBase extends InjectBase with NatBase {
   // APLAS 2.3 Object-Oriented Encapsulation
   trait Graph[T] {
     def edge(a: Exp[T], b: Exp[T]): Rel
-    // APLAS 2.1 path example
+    // APLAS 2.1 path def example
     def path(a: Exp[T], b: Exp[T]): Rel =
       edge(a,b) || exists[T] { z => edge(a,z) && path(z,b) }
   }
@@ -281,6 +281,7 @@ trait ReifyUtils extends ReifyUtilsBase with InjectBase with ListBase with Engin
   def globalTrace = () => globalTrace0
   def globalTrace_=(x:Exp[List[List[String]]]) = globalTrace0 = x
 
+  // APLAS 3.3 Tracing With Dynamic Variables
   def rule[T,U](s: String)(f: (Exp[T],Exp[U]) => Rel): (Exp[T],Exp[U]) => Rel =
     { (a,b) =>
       globalTrace = cons(term(s,List(a,b)),globalTrace());

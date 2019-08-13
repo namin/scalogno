@@ -333,6 +333,7 @@ trait TestGraphsBase extends MySuite with Base with Engine with NatBase with Lis
         (x === "b") && (y === "c") ||
         (x === "c") && (y === "a")
 
+      // APLAS 3.3 path rule def example
       override def path(x:Exp[String],y:Exp[String]) = rule("path")(super.path)(x,y)
     }
 
@@ -343,6 +344,7 @@ trait TestGraphsBase extends MySuite with Base with Engine with NatBase with Lis
       "pair(b,cons(path(a,b),cons(path(c,b),cons(path(b,b),cons(path(a,b),nil)))))",
       "pair(c,cons(path(b,c),cons(path(a,c),cons(path(c,c),cons(path(b,c),cons(path(a,c),nil))))))"
     )) {
+      // APLAS 3.3 path example
       runN[(String,List[List[String]])](5) { case Pair(q1,q2) =>
         traceG.path("a",q1) && globalTrace() === q2
       }

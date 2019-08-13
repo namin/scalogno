@@ -59,6 +59,7 @@ trait MetaTracer extends MetaBase {
 
 }
 
+// APLAS 3.4 Clause Reification as Controlled Side Effect
 trait MetaReify extends MetaBase {
   def existsList(a: Int)(f: (List[Exp[Any]] => Rel)): Rel = {
     f((0 until a).map{_ => fresh[Any]}.toList)

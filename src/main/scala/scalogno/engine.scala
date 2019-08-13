@@ -146,7 +146,7 @@ trait Engine extends Base {
         case Backtrack => // OK
       } finally {
         cstore = cstore1
-      dvars = dvars1
+        dvars = dvars1
       }
     }
     val q = fresh[T]

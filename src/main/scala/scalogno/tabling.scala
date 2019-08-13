@@ -11,7 +11,7 @@ trait TablingBase extends Base with Engine {
 
 }
 
-trait TablingImpl extends TablingBase {
+trait TablingImpl extends TablingBase { self =>
   // call table data structures and management
   type Answer = (Exp[Any] => Unit)
   case class Call(key: String, goal1: Exp[Any], cstore1: immutable.Set[Constraint], dvars1: immutable.Map[Int, Any], ldvars0: List[Exp[Any]], ldvars1: List[Exp[Any]], k1: Cont) {
@@ -25,8 +25,9 @@ trait TablingImpl extends TablingBase {
       // update actual state to symbolic after state
       dvarsSet(ldvars1)
     }
-    def equateState() = dvarsEqu(ldvars1)
-    def updateState() = dvarsSet(ldvars0)
+    def equateStateAfterCall() = dvarsEqu(ldvars1)
+    def updateStateBeforeCall() = dvarsSet(ldvars0)
+    def makeAnswer() = self.makeAnswer(goal1)
     def table = contTable(key).reverse
   }
 
@@ -117,19 +118,17 @@ trait TablingImpl extends TablingBase {
           val ansMap = new mutable.HashMap[String, Answer]
           callTable(cont.key) = ansMap
           rec { () =>
-            cont.updateState()
+            cont.updateStateBeforeCall()
             a // execute
           } { () =>
-            cont.equateState()
+            cont.equateStateAfterCall()
             val ansKey = extractStr(goal0)
-            ansMap.get(ansKey) match {
-              case None =>
-                val ans = makeAnswer(cont.goal1)
-                ansMap(ansKey) = ans // record new ansert and
-                for (cont1 <- cont.table) {
-                  resume(cont1, ans) // resume stored continuations
-                }
-              case Some(_) =>
+            if (!ansMap.contains(ansKey)) {
+              val ans = cont.makeAnswer()
+              ansMap(ansKey) = ans // record new ansert and
+              for (cont1 <- cont.table) {
+                resume(cont1, ans) // resume stored continuations
+              }
             }
           }
       }

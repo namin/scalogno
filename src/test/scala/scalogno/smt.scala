@@ -92,8 +92,8 @@ class TestFactorial extends MySuite with Smt with Engine {
   }
 }
 
-class TestFib extends MySuite with Smt with Engine /*with ListBase with TablingBase with TablingImpl*/ {
-  def fibo(n: Exp[Int], o: Exp[Int]): Rel = /*memo(term("fibo", List(n,o)))*/ {
+class TestFib extends MySuite with Smt with Engine {
+  def fibo(n: Exp[Int], o: Exp[Int]): Rel =
     ((n ==? 0) && (o ==? 1)) ||
     ((n ==? 1) && (o ==? 2)) ||
     { val n1,n2,o1,o2 = fresh[Int]
@@ -104,8 +104,6 @@ class TestFib extends MySuite with Smt with Engine /*with ListBase with TablingB
       fibo(n2, o2) &&
       fibo(n1, o1) }
 
-  }
-
   test("6") {
     expectResult(List("1", "2", "3", "5", "8", "13")) {
       runN[Int](6){ o => exists[Int]{n => fibo(n,o)} }
@@ -113,7 +111,7 @@ class TestFib extends MySuite with Smt with Engine /*with ListBase with TablingB
   }
 }
 
-class TestFibTab extends MySuite with Smt with Engine with ListBase with TablingBase with TablingImpl {
+class TestSmtTab extends MySuite with Smt with Engine with ListBase with TablingBase with TablingImpl {
   def fibo(n: Exp[Int], o: Exp[Int]): Rel = memo(term("fibo", List(n,o))) {
     ((n ==? 0) && (o ==? 1)) ||
     ((n ==? 1) && (o ==? 2)) ||
@@ -127,9 +125,48 @@ class TestFibTab extends MySuite with Smt with Engine with ListBase with Tabling
 
   }
 
-  test("6") {
-    expectResult(List("1", "2", "3")) { // TODO: only three results!
+  def faco(n: Exp[Int], o: Exp[Int]): Rel = memo(term("faco", List(n,o))) {
+    (n >= 0) &&
+    (
+      (n ==? 0) && (o ==? 1) ||
+
+      exists[Int,Int]{(n1,r) =>
+        (n - 1) ==? n1 &&
+          (n * r) ==? o &&
+        faco(n1, r)
+      }
+    )
+  }
+
+  test("faco 7") {
+    tabling(true)
+    expectResult(List("1", "1", "2", "6", "24", "120", "720")) {
+      runN[Int](7){ o => exists[Int]{n => faco(n,o)} }
+    }
+  }
+
+  /*
+  test("faco only 6") {
+    //tabling(true)
+    expectResult(List("720")) {
+      runN[Int](6){ o => faco(6,o) }
+    }
+  }
+  */
+
+  test("fibo 6") {
+    tabling(true)
+    expectResult(List("1", "2", "3", "8", "5", "13")) { // why is 8 and 5 reversed?
       runN[Int](6){ o => exists[Int]{n => fibo(n,o)} }
     }
   }
+
+  /*
+  test("fibo only 5") {
+    //tabling(true)
+    expectResult(List("5")) {
+      runN[Int](6){ o => fibo(3,o) }
+    }
+  }
+ */
 }

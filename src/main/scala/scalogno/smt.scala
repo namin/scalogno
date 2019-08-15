@@ -148,7 +148,7 @@ class Exe(command: String) {
   }
 
   def write(s: String): Unit = synchronized {
-    //println("smt: "+s)
+    println("smt: "+s)
     inputStream.get.write((s + "\n\n").getBytes)
     inputStream.get.flush()
   }

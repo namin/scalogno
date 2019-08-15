@@ -57,17 +57,19 @@ def makeCall(goal0: Exp[Any], k: Cont): Call = {
 def makeAnswer(g1: Exp[Any]): Answer = {
   val lcstore = cstore
   val lidx = cstore groupBy { case IsTerm(id, _ , _) => id case _ => -1 }
+  val lstate = solver.state
 
   (g2: Exp[Any]) => {
 
     val stack = new mutable.BitSet(varCount)
     val seenVars = new mutable.HashMap[Int,Int]
+    def seenVarsGet(id: Int) = seenVars.getOrElseUpdate(id,freshId)
     def copyVar(x: Exp[Any]): Exp[Any] = {
       val id = (Set(x.id) ++ (lcstore collect {
         case IsEqual(`x`,y) if y.id < x.id => y.id
         case IsEqual(y,`x`) if y.id < x.id => y.id
       })).min
-      val mid = seenVars.getOrElseUpdate(id,seenVars.size)
+      val mid = seenVarsGet(id)
       Exp(mid)
     }
     def copyTerm(x: Exp[Any]): Exp[Any] = lidx.getOrElse(x.id,Set.empty).headOption match {
@@ -83,10 +85,55 @@ def makeAnswer(g1: Exp[Any]): Answer = {
       case _ =>
         copyVar(x)
     }
+    // incomplete...
+    def toInt(s: String): Option[Int] = {
+      try {
+        Some(s.toInt)
+      } catch {
+        case e: Exception => None
+      }
+    }
+    def p(x: Exp[Any]): String = cstore.collect{case IsTerm(id, key, _) if id == x.id => key}.headOption match {
+      //case Some(key) if !toInt(key).isEmpty => key
+      case Some(key) => if (!toInt(key).isEmpty) key else {
+        println("key is "+key+" for "+x.id)
+        solver.addVar(x.id); "x"+x.id
+      }
+      case _ => solver.addVar(x.id); "x"+x.id
+    }
+    def copyLine(line: String, one: Boolean): String = {
+      (for (w <- line.split(" ")) yield {
+        if (w.startsWith("x")) {
+          var end = w.length
+          var v = w
+          while (v.endsWith(")")) {
+            end = end - 1
+            v = v.slice(0, v.length-1)
+          }
+          val id = w.slice(1, end).toInt
+          p(if (one) Exp(id) else copyTerm(Exp(id)))+w.slice(end, w.length)
+        } else w
+      }).mkString(" ")
+    }
+    def cleanLines(lines: List[String]): List[String] = {
+      lines.filter{line =>
+        //(!(line.startsWith("(declare-const") && line("(declare-const ".length) != 'x'))
+        !line.startsWith("(declare-const")
+      }
+    }
 
     val g1_copy = copyTerm(g1)
 
     g1_copy === g2
+
+    val (lines1, _) = solver.state
+    val (lines2, _) = lstate
+    solver.reset()
+    val lines1c = cleanLines(lines1.map(copyLine(_, true)))
+    val lines2c = cleanLines(lines2.map(copyLine(_, false)))
+    solver.seenvars.foreach(solver.decl)
+    solver.restore((lines2c++lines1c++solver.lines, solver.seenvars))
+    extractModel()
   }
 }
 
@@ -114,9 +161,11 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
           dvarsSet(cont.ldvars0)
           a
         } { () =>
-          extractModel()
           dvarsEqu(cont.ldvars1)
-          val ansKey = extractStr(goal0)
+          val cstore1 = cstore
+          extractModel()
+          val ansKey = extractStr(goal0)+freshId
+          cstore = cstore
           ansMap.get(ansKey) match {
             case None =>
               val ans = makeAnswer(cont.goal1)

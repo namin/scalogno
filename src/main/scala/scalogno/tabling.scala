@@ -111,7 +111,7 @@ def makeAnswer(g1: Exp[Any]): Answer = {
             v = v.slice(0, v.length-1)
           }
           val id = w.slice(1, end).toInt
-          p(if (one) Exp(id) else copyTerm(Exp(id)))+w.slice(end, w.length)
+          p(if (one) Exp(seenVars.getOrElse(id,id)) else copyTerm(Exp(id)))+w.slice(end, w.length)
         } else w
       }).mkString(" ")
     }
@@ -133,7 +133,6 @@ def makeAnswer(g1: Exp[Any]): Answer = {
     val lines2c = cleanLines(lines2.map(copyLine(_, false)))
     solver.seenvars.foreach(solver.decl)
     solver.restore((lines2c++lines1c++solver.lines, solver.seenvars))
-    extractModel()
   }
 }
 

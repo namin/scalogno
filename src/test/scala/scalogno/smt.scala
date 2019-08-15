@@ -132,8 +132,8 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
 
       exists[Int,Int]{(n1,r) =>
         (n - 1) ==? n1 &&
-          (n * r) ==? o &&
-        faco(n1, r)
+        faco(n1, r) &&
+        (n * r) ==? o
       }
     )
   }
@@ -145,28 +145,24 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
     }
   }
 
-  /*
   test("faco only 6") {
     //tabling(true)
     expectResult(List("720")) {
       runN[Int](6){ o => faco(6,o) }
     }
   }
-  */
 
   test("fibo 6") {
     tabling(true)
-    expectResult(List("1", "2", "3", "8", "5", "13")) { // why is 8 and 5 reversed?
+    expectResult(List("1", "2", "3", "5", "8", "13")) {
       runN[Int](6){ o => exists[Int]{n => fibo(n,o)} }
     }
   }
 
-  /*
   test("fibo only 5") {
     //tabling(true)
     expectResult(List("5")) {
       runN[Int](6){ o => fibo(3,o) }
     }
   }
- */
 }

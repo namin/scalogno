@@ -3,7 +3,10 @@ package scalogno
 import scala.collection._
 
 class SmtSolver {
-  var lines: List[List[String]] = Nil
+  var lines: List[String] = Nil
+  var seenvars: immutable.Set[Int] = immutable.Set.empty
+  def addVar(id: Int) = { seenvars += id }
+
   var smt: Exe = _
   def init() = {
     smt = new Exe("cvc4 -m --interactive --lang smt")
@@ -18,56 +21,27 @@ class SmtSolver {
       //case debug => println("smt gives "+debug); true
     }
   }
-  var scope = 0
-  def push(): Unit = {
-    scope += 1
-    lines = Nil::lines
-    smt.write("(push)")
-  }
-  def pop(): Unit = {
-    scopes = scopes.collect{case (k,v) if v < scope => (k,v)}.toMap
-    if (scope == 0) { return }
-    scope -= 1
-    lines = lines.tail
-    smt.write("(pop)")
-  }
   def reset(): Unit = {
-    scopes = Map.empty
     lines = Nil
-    scope = 0
+    seenvars = immutable.Set.empty
     smt.write("(reset)")
     smt.write("(set-logic ALL_SUPPORTED)")
   }
-  type State = (List[List[String]], Map[Int,Int],Int)
-  def state: State = (lines,scopes,scope)
+  type State = (List[String],immutable.Set[Int])
+  def state: State = (lines, seenvars)
   def restore(s: State): Unit = {
     reset()
     lines = s._1
-    scopes = s._2
-    scope = s._3
-    for (block <- lines.reverse) {
-      //smt.write("(push)")
-      for (line <- block.reverse) {
-        smt.write(line)
-      }
+    seenvars = s._2
+    for (line <- lines.reverse) {
+      smt.write(line)
     }
   }
-  var scopes: Map[Int,Int] = Map.empty
   def decl(id: Int): Unit = {
-    scopes.get(id) match {
-      case None =>
-        add(s"(declare-const x$id Int)")
-        scopes += (id -> scope)
-      case Some(s) =>
-        if (s >= scope) {
-          add(s"(declare-const x$id Int)")
-          scopes += (id -> scope)
-        }
-    }
+    add(s"(declare-const x$id Int)")
   }
   def add(c: String): Unit = {
-    print(scope.toString+" ")
-    lines = (c::lines.head)::lines.tail
+    lines = c::lines
     smt.write(c)
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
@@ -78,7 +52,7 @@ class SmtSolver {
     for (m <- p.findAllMatchIn(s)) {
       val id = m.group(1).toInt
       val v = m.group(2).toInt
-      println(s"$id has $v")
+      println(s"x$id = $v")
       f(id, v)
     }
   }
@@ -89,7 +63,7 @@ trait Smt extends Base with InjectBase {
   case class A[+T](x: Exp[T]) extends Z[T] {
     override def toString = {
       val cs = cstore.collect{ case(IsTerm(id, k, _)) if x.id == id => k}.toIterator
-      if (cs.hasNext) cs.next else { addVar(x.id); "x"+x.id }
+      if (cs.hasNext) cs.next else { solver.addVar(x.id); "x"+x.id }
     }
   }
   case class P[+T](s: String, args: List[Z[Any]]) extends Z[T] {
@@ -115,13 +89,11 @@ trait Smt extends Base with InjectBase {
     def +(b: Z[Int]): Z[Int] = P("+", List(a, b))
   }
 
-  val seenvars0: immutable.Set[Int] = immutable.Set.empty
-  var seenvars = seenvars0
-  def addVar(id: Int) = { seenvars += id }
   def zAssert(p: P[Boolean]): Rel = {
-    seenvars = seenvars0
+    val seenvars0 = solver.seenvars
     val c = P("assert", List(p)).toString
-    seenvars.foreach{solver.decl}
+    solver.seenvars.foreach{id =>
+      if (!seenvars0.contains(id)) { solver.decl(id) }}
     solver.add(c)
     if (!solver.checkSat()) throw Backtrack
     Yes
@@ -176,7 +148,7 @@ class Exe(command: String) {
   }
 
   def write(s: String): Unit = synchronized {
-    println("smt: "+s)
+    //println("smt: "+s)
     inputStream.get.write((s + "\n\n").getBytes)
     inputStream.get.flush()
   }

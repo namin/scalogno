@@ -155,7 +155,7 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
     }
   }
 
-  test("fibo 7") {
+  test("fibo 5") {
     tabling(true)
     expectResult(List("1", "2", "3", "5", "8")) {
       runN[Int](5){ o =>

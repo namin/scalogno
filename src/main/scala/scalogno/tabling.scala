@@ -31,6 +31,7 @@ val ansTable = new mutable.HashMap[String, mutable.HashMap[String, Answer]]
 val contTable = new mutable.HashMap[String, List[Call]]
 
   var enabled = true
+  var forward = false
 
   def tabling(on: Boolean): Unit = {
     ansTable.clear
@@ -150,6 +151,7 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
     def resume(cont: Call, ans: Answer) = rec{ () => cont.load(ans); Yes }(cont.k1)
 
     //extractModelIfUnique()
+    if (forward) extractModel()
     val cont = makeCall(goal0, k)
     ansTable.get(cont.key) match {
       case Some(answers) =>

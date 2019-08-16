@@ -146,6 +146,18 @@ trait Engine extends Base {
       register(IsEqual(Exp(x),term(v.toString, Nil)))
     })
   }
+  def extractModelIfUnique(): Unit = {
+    val state = solver.state
+    solver.extractModel({(x,v) =>
+      solver.add("(push)")
+      solver.add(s"(assert (not (= x$x $v)))")
+      if (!solver.checkSat()) {
+        register(IsEqual(Exp(x),term(v.toString, Nil)))
+      }
+      solver.add("(pop)")
+    })
+    solver.restore(state)
+  }
 
 // execution (depth-first)
 def run[T](f: Exp[T] => Rel): Seq[String] = {

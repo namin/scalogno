@@ -104,9 +104,9 @@ class TestFib extends MySuite with Smt with Engine {
       fibo(n2, o2) &&
       fibo(n1, o1) }
 
-  test("6") {
-    expectResult(List("1", "2", "3", "5", "8", "13")) {
-      runN[Int](6){ o => exists[Int]{n => fibo(n,o)} }
+  test("7") {
+    expectResult(List("1", "2", "3", "5", "8", "13", "21")) {
+      runN[Int](7){ o => exists[Int]{n => fibo(n,o)} }
     }
   }
 }
@@ -155,10 +155,10 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
     }
   }
 
-  test("fibo 5") {
+  test("fibo 7") {
     tabling(true)
-    expectResult(List("1", "2", "3", "5", "8")) {
-      runN[Int](5){ o =>
+    expectResult(List("1", "2", "3", "5", "8", "21", "55")) { // missing 13?
+      runN[Int](7){ o =>
         exists[Int]{n => fibo(n,o)}
       }
     }

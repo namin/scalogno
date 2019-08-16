@@ -14,6 +14,12 @@ class SmtSolver {
     smt.write("(set-logic ALL_SUPPORTED)")
   }
   def checkSat(): Boolean = {
+    if (!ran) {
+      for (line <- lines.reverse) {
+        smt.write(line)
+      }
+      ran = true
+    }
     smt.write("(check-sat)")
     smt.readAtom() match {
       case "sat" => true
@@ -29,22 +35,22 @@ class SmtSolver {
   }
   type State = (List[String],immutable.Set[Int])
   def state: State = (lines, seenvars)
+  var ran = true
   def restore(s: State): Unit = {
     reset()
     lines = s._1
     seenvars = s._2
-    for (line <- lines.reverse) {
-      smt.write(line)
-    }
+    ran = false
   }
   def decl(id: Int): Unit = {
     add(s"(declare-const x$id Int)")
   }
   def add(c: String): Unit = {
     lines = c::lines
-    smt.write(c)
+    if (ran) smt.write(c)
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
+    //assert(checkSat())
     checkSat()
     smt.write("(get-model)")
     val s = smt.readSExp()

@@ -138,6 +138,7 @@ def makeAnswer(g1: Exp[Any]): Answer = {
     val lines2c = cleanLines(lines2.map(copyLine(_, false)))
     solver.seenvars.foreach(solver.decl)
     solver.restore((lines2c++lines1c++solver.lines, solver.seenvars))
+    if (!solver.checkSat()) { throw Backtrack }
   }
 }
 

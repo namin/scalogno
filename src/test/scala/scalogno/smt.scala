@@ -137,16 +137,16 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
       }
     )
   }
-
+/*
   test("faco 7") {
     tabling(true)
     expectResult(List("1", "1", "2", "6", "24", "120", "720")) {
       runN[Int](7){ o => exists[Int]{n => faco(n,o)} }
     }
   }
-
+ */
   test("faco only 6") {
-    //tabling(true)
+    tabling(true)
     expectResult(List("720")) {
       runN[Int](6){ o => faco(6,o) }
     }

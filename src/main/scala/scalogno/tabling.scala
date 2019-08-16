@@ -151,9 +151,9 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
 
     val cont = makeCall(goal0, k)
     ansTable.get(cont.key) match {
-      case Some(answers) =>
+      case Some(answers) if !answers.isEmpty =>
         for (ans <- answers.values) resume(cont, ans)
-      case None =>
+      case _ =>
         val ansMap = new mutable.HashMap[String, Answer]
         ansTable(cont.key) = ansMap
         rec { () =>

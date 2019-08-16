@@ -1,6 +1,6 @@
 package scalogno
 
-import org.scalatest._
+import org.scalatest.{Engine => _, _}
 
 class TestExe extends MySuite with Engine {
   test("1") {

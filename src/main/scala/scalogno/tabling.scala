@@ -149,9 +149,10 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
 
     def resume(cont: Call, ans: Answer) = rec{ () => cont.load(ans); Yes }(cont.k1)
 
+    //extractModelIfUnique()
     val cont = makeCall(goal0, k)
     ansTable.get(cont.key) match {
-      case Some(answers) if !answers.isEmpty =>
+      case Some(answers) =>
         for (ans <- answers.values) resume(cont, ans)
       case _ =>
         val ansMap = new mutable.HashMap[String, Answer]

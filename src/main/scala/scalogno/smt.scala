@@ -50,8 +50,7 @@ class SmtSolver {
     if (ran) smt.write(c)
   }
   def extractModel(f: (Int,Int) => Unit): Unit = {
-    //assert(checkSat())
-    checkSat()
+    assert(checkSat())
     smt.write("(get-model)")
     val s = smt.readSExp()
     val p = raw"\(define-fun x([0-9]+) \(\) Int ([0-9]+)\)".r

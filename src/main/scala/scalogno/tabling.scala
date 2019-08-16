@@ -49,7 +49,11 @@ def makeCall(goal0: Exp[Any], k: Cont): Call = {
   val goal = term("goal",List(goal0, term("state0", ldvars0), term("state1", ldvars1)))
 
   // but disregard state for memoization (compute key for goal0)
+  val cstore1 = cstore
+  extractModel()
   val key = extractStr(goal0)
+  cstore = cstore1
+
   val cont = Call(key,goal,cstore,dvars,ldvars0,ldvars1,solver.state,k)
   contTable(key) = cont::contTable.getOrElse(key,Nil)
   cont
@@ -150,8 +154,6 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
 
     def resume(cont: Call, ans: Answer) = rec{ () => cont.load(ans); Yes }(cont.k1)
 
-    //extractModelIfUnique()
-    if (forward) extractModel()
     val cont = makeCall(goal0, k)
     ansTable.get(cont.key) match {
       case Some(answers) =>

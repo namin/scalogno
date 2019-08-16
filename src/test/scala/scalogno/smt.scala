@@ -140,7 +140,6 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
 
   test("faco 7") {
     tabling(true)
-    forward = false
     expectResult(List("1", "1", "2", "6", "24", "120", "720")) {
       runN[Int](7){ o => exists[Int]{n => faco(n,o)}
       }
@@ -149,7 +148,6 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
 
   test("faco only 6") {
     tabling(true)
-    forward = true
     expectResult(List("720")) {
       runN[Int](6){ o =>
         faco(6,o)
@@ -157,11 +155,10 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
     }
   }
 
-  test("fibo 6") {
+  test("fibo 7") {
     tabling(true)
-    forward = false
-    expectResult(List("1", "2", "3", "5", "8", "13")) {
-      runN[Int](6){ o =>
+    expectResult(List("1", "2", "3", "5", "8")) {
+      runN[Int](5){ o =>
         exists[Int]{n => fibo(n,o)}
       }
     }
@@ -169,7 +166,6 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
 
   test("fibo only 3") {
     tabling(true)
-    forward = true
     expectResult(List("5")) {
       runN[Int](6){ o =>
         fibo(3,o)

@@ -63,7 +63,7 @@ def makeAnswer(g1: Exp[Any]): Answer = {
 
     val stack = new mutable.BitSet(varCount)
     val seenVars = new mutable.HashMap[Int,Int]
-    def seenVarsGet(id: Int) = seenVars.getOrElseUpdate(id,freshId)
+    def seenVarsGet(id: Int) = seenVars.getOrElseUpdate(id,seenVars.size)
     def copyVar(x: Exp[Any]): Exp[Any] = {
       val id = (Set(x.id) ++ (lcstore collect {
         case IsEqual(`x`,y) if y.id < x.id => y.id
@@ -161,10 +161,8 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
           a
         } { () =>
           dvarsEqu(cont.ldvars1)
-          val cstore1 = cstore
           extractModel()
-          val ansKey = extractStr(goal0)+freshId
-          cstore = cstore
+          val ansKey = extractStr(goal0)
           ansMap.get(ansKey) match {
             case None =>
               val ans = makeAnswer(cont.goal1)

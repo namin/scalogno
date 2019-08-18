@@ -3,7 +3,7 @@ import scala.collection._
 
 trait TablingBase extends Base with Engine {
 
-  def memo(goal: Exp[Any])(a: => Rel): Rel
+  def memo(goal: Exp[Any], f: Exp[Any] => Exp[Any] = {x => x})(a: => Rel): Rel
 
   def tabling(on: Boolean): Unit
 
@@ -31,7 +31,6 @@ val ansTable = new mutable.HashMap[String, mutable.HashMap[String, Answer]]
 val contTable = new mutable.HashMap[String, List[Call]]
 
   var enabled = true
-  var forward = false
 
   def tabling(on: Boolean): Unit = {
     ansTable.clear
@@ -40,7 +39,7 @@ val contTable = new mutable.HashMap[String, List[Call]]
   }
 
 // save complete call state
-def makeCall(goal0: Exp[Any], k: Cont): Call = {
+def makeCall(goal0: Exp[Any], k: Cont, f: Exp[Any] => Exp[Any]): Call = {
   val dvarsRange = (0 until dvarCount).toList
   val ldvars0 = dvarsRange.map(i => fresh[Any]) // symbolic state before call
   val ldvars1 = dvarsRange.map(i => fresh[Any]) // symbolic state for continuation / after call
@@ -51,7 +50,7 @@ def makeCall(goal0: Exp[Any], k: Cont): Call = {
   // but disregard state for memoization (compute key for goal0)
   val cstore1 = cstore
   extractModel()
-  val key = extractStr(goal0)
+  val key = extractStr(f(goal0))
   cstore = cstore1
 
   val cont = Call(key,goal,cstore,dvars,ldvars0,ldvars1,solver.state,k)
@@ -149,13 +148,13 @@ def dvarsSet(ls: List[Exp[Any]]) = {
 def dvarsEqu(ls: List[Exp[Any]]) =
   dvars foreach { case (k,v:Exp[Any]) => v === ls(k) }
 
-def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
+def memo(goal0: Exp[Any], f: Exp[Any] => Exp[Any] = {x => x})(a: => Rel): Rel = new Rel {
   override def exec(rec: Exec)(k: Cont): Unit = {
     if (!enabled) return rec(() => a)(k)
 
     def resume(cont: Call, ans: Answer) = rec{ () => cont.load(ans); Yes }(cont.k1)
 
-    val cont = makeCall(goal0, k)
+    val cont = makeCall(goal0, k, f)
     ansTable.get(cont.key) match {
       case Some(answers) =>
         for (ans <- answers.values) resume(cont, ans)
@@ -168,7 +167,7 @@ def memo(goal0: Exp[Any])(a: => Rel): Rel = new Rel {
         } { () =>
           dvarsEqu(cont.ldvars1)
           extractModel()
-          val ansKey = extractStr(goal0)
+          val ansKey = extractStr(f(goal0))
           ansMap.get(ansKey) match {
             case None =>
               val ans = makeAnswer(cont.goal1)

@@ -173,3 +173,88 @@ class TestSmtTab extends MySuite with Smt with Engine with ListBase with Tabling
     }
   }
 }
+
+class TestSmtTabGraph extends MySuite with Smt with Engine with ListBase with TablingBase with TablingImpl {
+
+  def edge(x:Exp[String],y:Exp[String],c:Exp[Int]) =
+    (x === "a") && (y === "b") && (c ==? 1) ||
+    (x === "b") && (y === "c") && (c ==? 1) ||
+    (x === "c") && (y === "a") && (c ==? 1)
+
+  def memoShortestPath(a: Exp[String], b: Exp[String], c: Exp[Int])(r: => Rel): Rel = memo(term("path",List(a,b,c)), { x => (cstore collect { case IsTerm(id, k , List(a,b,_)) if id==x.id => term(k, List(a,b)) }).head })(r)
+
+  def pathL(a: Exp[String], b: Exp[String], c: Exp[Int]): Rel = memoShortestPath(a, b, c) {
+    edge(a,b,c) || exists[String] { z => exists[Int] { c1 => pathL(a,z,c1) && exists[Int] { c2 => { println("--"+extractStr(term("path-edge",List(a,z,b)))); edge(z,b,c2) && c1+c2 ==? c
+    }}}}}
+
+  def pathR(a: Exp[String], b: Exp[String], c: Exp[Int]): Rel = memoShortestPath(a, b, c) {
+    edge(a,b,c) || exists[String] { z => val c1,c2 = fresh[Int]; edge(a,z,c1) && pathR(z,b,c2) && c1 + c2 ==? c
+    }}
+
+  val globalTrace = DVar(nil: Exp[List[List[String]]])
+
+  def pathLT(a: Exp[String], b: Exp[String], c: Exp[Int]): Rel = memoShortestPath(a, b, c) {
+    globalTrace := cons(term("path",List(a,b,c)), globalTrace())
+    edge(a,b,c) || exists[String] { z => exists[Int] { c1 => pathLT(a,z,c1) && exists[Int] { c2 => { println("--"+extractStr(term("path-edge",List(a,z,b)))); edge(z,b,c2) && c1+c2 ==? c
+  }}}}}
+  def pathRT(a: Exp[String], b: Exp[String], c: Exp[Int]): Rel = memoShortestPath(a, b, c) {
+    globalTrace := cons(term("path",List(a,b,c)), globalTrace())
+    edge(a,b,c) || exists[String] { z => val c1,c2 = fresh[Int]; edge(a,z,c1) && pathRT(z,b,c2) && c1 + c2 ==? c
+  }}
+
+  test("pathR") {
+    expectResult(List(
+      "cons(b,1)","cons(c,2)","cons(a,3)"
+    )) {
+      tabling(true)
+      runN[String](5) { q =>
+        val b, c = fresh[Int]
+        q === cons(b,c) &&
+        pathR("a",b,c)
+      }
+    }
+    println("done")
+  }
+
+  test("pathL") {
+    expectResult(List(
+      "cons(b,1)","cons(c,2)","cons(a,3)"
+    )) {
+      runN[String](5) { q =>
+        tabling(true)
+        val b, c = fresh[Int]
+        q === cons(b,c) &&
+        pathL("a",b,c)
+      }
+    }
+    println("done")
+  }
+
+  test("pathRT") {
+    expectResult(List(
+      "pair(pair(b,1),cons(path(a,b,1),nil))",
+      "pair(pair(c,2),cons(path(b,c,1),cons(path(a,c,2),nil)))",
+      "pair(pair(a,3),cons(path(c,a,1),cons(path(b,a,2),cons(path(a,a,3),nil))))"
+    )) {
+      tabling(true)
+      runN[(String,List[List[String]])](5) { case Pair(Pair(b,c),t) =>
+        pathRT("a",b.asInstanceOf[Exp[String]],c.asInstanceOf[Exp[Int]]) && globalTrace() === t
+      }
+    }
+    println("done")
+  }
+
+  test("pathLT") {
+    expectResult(List(
+      "pair(pair(b,1),cons(path(a,b,1),nil))",
+      "pair(pair(c,2),cons(path(a,b,1),cons(path(a,c,2),nil)))",
+      "pair(pair(a,3),cons(path(a,b,1),cons(path(a,c,2),cons(path(a,a,3),nil))))"
+    )) {
+      tabling(true)
+      runN[(String,List[List[String]])](5) { case Pair(Pair(b,c),t) =>
+        pathLT("a",b.asInstanceOf[Exp[String]],c.asInstanceOf[Exp[Int]]) && globalTrace() === t
+      }
+    }
+    println("done")
+  }
+}

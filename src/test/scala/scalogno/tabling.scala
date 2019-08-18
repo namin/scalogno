@@ -50,27 +50,6 @@ trait TestTablingAppBase extends MySuite with ListBase with NatBase with Tabling
       }
     }
   }
-
-  def list8(q: Exp[List[String]]): Rel = memo(term("list8", List(q))) {
-      val x1 = fresh[String]
-      val x2 = fresh[String]
-      val x3 = fresh[String]
-      val x4 = fresh[String]
-      val x5 = fresh[String]
-      val x6 = fresh[String]
-      val x7 = fresh[String]
-      val x8 = fresh[String]
-      q === cons(x1,cons(x2,cons(x3,cons(x4,cons(x5,cons(x6,cons(x7,cons(x8, nil))))))))
-  }
-
-  test("exp4") {
-    expectResult(List()) {
-      runN[List[String]](3) { q =>
-        tabling(true)
-        list8(q) && exp(q,nil)
-      }
-    }
-  }
 }
 
 class TestTablingApp extends TestTablingAppBase with TablingImpl

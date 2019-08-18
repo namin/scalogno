@@ -67,7 +67,7 @@ def makeAnswer(g1: Exp[Any]): Answer = {
 
     val stack = new mutable.BitSet(varCount)
     val seenVars = new mutable.HashMap[Int,Int]
-    def seenVarsGet(id: Int) = seenVars.getOrElseUpdate(id,seenVars.size)
+    def seenVarsGet(id: Int) = seenVars.getOrElseUpdate(id,freshId)
     def copyVar(x: Exp[Any]): Exp[Any] = {
       val id = (Set(x.id) ++ (lcstore collect {
         case IsEqual(`x`,y) if y.id < x.id => y.id

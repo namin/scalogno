@@ -8,7 +8,7 @@ solver.init()
 
 val Backtrack = new Exception
 
-var varCount: Int = 100 // TODO: need to fix canon tabling's makeAnswer
+var varCount: Int = 0
 def freshId = {
   val id = varCount
   varCount += 1

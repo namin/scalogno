@@ -22,3 +22,7 @@ Scalogno as presented in APLAS'19 (forthcoming).
 - [4.3 example](src/test/scala/scalogno/tabling.scala#L192)
 - [4.4 Definite Clause Grammar (DFG)](src/test/scala/scalogno/tabling.scala#L6)
 - [4.4 example](src/test/scala/scalogno/tabling.scala#L28)
+
+Beyond APLAS:
+
+- the [all](https://github.com/namin/scalogno/tree/all) adds an SMT solver as a backend, and combines it with tabling too. Work remains to refactor the combination into composable modules, and ... find a killer app beyond shortest paths. :)

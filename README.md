@@ -25,4 +25,4 @@ Scalogno as presented in APLAS'19 ([PDF](https://namin.seas.harvard.edu/files/na
 
 Beyond APLAS:
 
-- the [all](https://github.com/namin/scalogno/tree/all) adds an SMT solver as a backend, and combines it with tabling too. Work remains to refactor the combination into composable modules, and ... find a killer app beyond shortest paths. :)
+- the [all](https://github.com/namin/scalogno/tree/all) branch adds an SMT solver as a backend, and combines it with tabling too. Work remains to refactor the combination into composable modules, and ... find a killer app beyond shortest paths. :)

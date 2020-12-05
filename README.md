@@ -1,7 +1,7 @@
 scalogno
 ========
 
-Scalogno as presented in APLAS'19 (forthcoming).
+Scalogno as presented in APLAS'19 ([PDF](https://namin.seas.harvard.edu/files/namin/files/scalogno.pdf)).
 
 - [2.1 Relations as Functions](src/test/scala/scalogno/core.scala#L274)
 - [2.1 edge example](src/test/scala/scalogno/core.scala#L281)

@@ -107,8 +107,6 @@ trait Base {
         List(IsTerm(b, key, args))
       case (IsTerm(a1, key, args), IsEqual(Exp(a),Exp(b))) if a == a1 =>
         List(IsTerm(b, key, args))
-      case (IsEqual(Exp(a),Exp(b)), IsTerm(a1, key, args)) if a == a1 =>
-        List(IsTerm(b, key, args))
       case (IsTerm(b1, key, args), IsEqual(Exp(a),Exp(b))) if b == b1 =>
         List(IsTerm(a, key, args))
       case (IsEqual(Exp(a),Exp(b)), IsTerm(b1, key, args)) if b == b1 =>

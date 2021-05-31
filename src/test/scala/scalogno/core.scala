@@ -1,8 +1,9 @@
 package scalogno
 
 import org.scalatest.{Engine => _, _}
+import org.scalatest.funsuite.AnyFunSuite
 
-class MySuite extends FunSuite {
+class MySuite extends AnyFunSuite {
   def expectResult(expected: Object)(actual: Object) = {
     assert(expected == actual)
   }
